@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Draw the Topic</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+  :root{
+    --cork:#b98a54; --cork-dark:#8f6438; --cork-shadow:#5c3e1f;
+    --paper:#fffdf6; --ink:#2b2118; --ink-soft:#6b5c4a;
+    --pin-red:#c1443c; --pin-green:#3e7c59; --pin-blue:#3b5a8a; --gold:#d3a123;
+    --accent:#3e7c59; --accent-dark:#2e5d43;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:#f4ece0;font-family:'Inter',sans-serif;color:var(--ink);min-height:100vh;}
+  h1,h2,.hand{font-family:'Kalam',cursive;}
+  button{font-family:'Inter',sans-serif;cursor:pointer;border:none;}
+  .btn{padding:12px 22px;border-radius:10px;font-weight:600;font-size:15px;background:var(--accent);color:#fff;transition:transform .12s ease, background .12s ease;}
+  .btn:hover{background:var(--accent-dark);transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn.secondary{background:transparent;color:var(--ink-soft);border:1.5px solid #d8cdb8;}
+  .btn.secondary:hover{background:#f1e9d8;color:var(--ink);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+  .btn.small{padding:8px 14px;font-size:13px;}
+
+  .setup-wrap{max-width:520px;margin:0 auto;padding:40px 20px;}
+  .setup-card{background:var(--paper);border-radius:14px;padding:26px;box-shadow:0 6px 0 rgba(0,0,0,0.08);}
+  .setup-card h2{margin-top:0;}
+  .setup-card ol{padding-left:20px;line-height:1.7;font-size:14px;}
+  .setup-card a{color:var(--accent-dark);}
+  .setup-card input{width:100%;padding:12px 14px;border-radius:10px;border:1.5px solid #d8cdb8;font-size:15px;margin-top:6px;}
+  .setup-card .err{color:var(--pin-red);font-size:13px;margin-top:8px;}
+
+  .draw-wrap{max-width:480px;margin:0 auto;padding:20px 16px 32px;}
+  .topic-card{background:var(--paper);border-radius:14px;padding:18px 20px;text-align:center;box-shadow:0 6px 0 rgba(0,0,0,0.08);margin-bottom:16px;position:relative;}
+  .topic-card .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
+  .topic-card h1{font-size:26px;margin:4px 0 0;line-height:1.15;color:var(--ink);}
+  .timer-pill{display:inline-block;margin-top:10px;padding:6px 14px;border-radius:999px;background:#f1e9d8;font-weight:700;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .timer-pill.low{background:#f6d9d6;color:var(--pin-red);}
+  .canvas-shell{background:var(--paper);border-radius:14px;padding:10px;box-shadow:0 6px 0 rgba(0,0,0,0.08);}
+  canvas{display:block;width:100%;aspect-ratio:4/3;background:#fff;border-radius:8px;touch-action:none;border:1px dashed #e3d9c4;}
+  .tools{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-top:12px;flex-wrap:wrap;}
+  .swatches{display:flex;gap:8px;}
+  .swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
+  .swatch.active{border-color:var(--ink);transform:scale(1.1);}
+  .sizes{display:flex;gap:6px;}
+  .size-btn{width:32px;height:32px;border-radius:8px;background:#f1e9d8;display:flex;align-items:center;justify-content:center;}
+  .size-btn.active{background:var(--accent);}
+  .size-btn span{border-radius:50%;background:var(--ink);display:block;}
+  .size-btn.active span{background:#fff;}
+  .name-row{margin-top:14px;}
+  .name-row input{width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid #d8cdb8;font-family:'Inter',sans-serif;font-size:14px;background:var(--paper);}
+  .actions{display:flex;gap:10px;margin-top:14px;}
+  .actions .btn{flex:1;}
+  .confirm{text-align:center;padding:40px 20px;}
+  .confirm .stamp{font-size:52px;}
+  .confirm h2{font-size:26px;margin:10px 0 4px;}
+  .confirm p{color:var(--ink-soft);font-size:14px;}
+
+  .vote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;margin-top:16px;}
+  .vote-card{background:var(--paper);border-radius:10px;padding:8px 8px 10px;box-shadow:0 4px 0 rgba(0,0,0,0.08);text-align:center;position:relative;}
+  .vote-card img{width:100%;border-radius:6px;display:block;background:#fff;}
+  .vote-card .who{font-family:'Kalam',cursive;font-size:13px;color:var(--ink-soft);margin-top:6px;}
+  .vote-card .vote-btn{margin-top:8px;width:100%;padding:8px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:13px;}
+  .vote-card .vote-btn:disabled{background:#e3d9c4;color:var(--ink-soft);}
+  .vote-card.chosen{outline:3px solid var(--accent);}
+  .vote-count{font-size:12px;color:var(--ink-soft);margin-top:4px;font-weight:600;}
+  .crown{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:22px;}
+
+  .host-wrap{padding:24px;min-height:100vh;background:radial-gradient(circle at 20% 10%, var(--cork) 0%, var(--cork-dark) 70%);}
+  .host-top{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px;}
+  .qr-box{background:var(--paper);border-radius:14px;padding:18px;text-align:center;box-shadow:0 8px 0 var(--cork-shadow);flex:0 0 auto;}
+  .qr-box .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:700;margin-bottom:8px;}
+  #qrcode{display:flex;justify-content:center;margin:6px 0;}
+  .qr-box .hint{font-size:12px;color:var(--ink-soft);margin-top:6px;max-width:170px;}
+  .control-panel{background:var(--paper);border-radius:14px;padding:18px 20px;box-shadow:0 8px 0 var(--cork-shadow);flex:1 1 320px;}
+  .control-panel label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:700;}
+  .control-panel input[type=text]{width:100%;margin-top:6px;padding:12px 14px;border-radius:10px;border:1.5px solid #d8cdb8;font-size:17px;font-family:'Kalam',cursive;background:#fffef9;}
+  .control-panel input[type=number]{width:70px;padding:8px 10px;border-radius:8px;border:1.5px solid #d8cdb8;font-size:14px;}
+  .control-row{display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap;}
+  .phase-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #eee0c8;flex-wrap:wrap;gap:10px;}
+  .phase-badge{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
+  .phase-badge.drawing{background:#dcefe2;color:var(--accent-dark);}
+  .phase-badge.voting{background:#fde9c9;color:#8a5c0f;}
+  .phase-badge.results{background:#e6dcf6;color:#5b3e8a;}
+  .host-timer{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .board-header{display:flex;justify-content:space-between;align-items:center;color:#fff8ec;margin:18px 0 12px;}
+  .board-header h1{font-size:24px;margin:0;text-shadow:0 2px 0 rgba(0,0,0,.2);}
+  .board-header .count{font-size:13px;opacity:.85;font-family:'Inter',sans-serif;}
+  #board{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:22px 26px;padding:8px 4px 20px;}
+  .pin-card{background:var(--paper);border-radius:4px;padding:10px 10px 34px;box-shadow:0 10px 18px rgba(0,0,0,0.28);position:relative;}
+  .pin-card.winner{outline:3px solid var(--gold);}
+  .pin-card img{width:100%;display:block;border-radius:2px;background:#fff;}
+  .pin-card .pin-dot{position:absolute;top:-9px;left:50%;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;box-shadow:0 3px 4px rgba(0,0,0,.35);}
+  .pin-card .who{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-family:'Kalam',cursive;font-size:14px;color:var(--ink-soft);}
+  .pin-card .votes-badge{position:absolute;bottom:8px;right:10px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
+  .empty-state{color:#fff8ec;text-align:center;padding:60px 20px;opacity:.85;}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b2118;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;z-index:999;max-width:90%;text-align:center;}
+  @media (max-width:600px){ .host-wrap{padding:14px;} .host-top{flex-direction:column;} }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const isHost = params.get('host') === '1';
+  const dbUrl = params.get('db');
+  const app = document.getElementById('app');
+  const POLL_MS = 4000;
+  const CANVAS_W = 400, CANVAS_H = 300;
+
+  function showToast(msg){
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(()=>t.remove(), 4000);
+  }
+
+  function participantUrl(){
+    const url = new URL(window.location.href);
+    url.searchParams.delete('host');
+    return url.toString();
+  }
+  function hashCode(str){ let h=0; for(let i=0;i<str.length;i++){ h=(h<<5)-h+str.charCodeAt(i); h|=0; } return h; }
+  function fmtTime(ms){
+    if(ms < 0) ms = 0;
+    const s = Math.floor(ms/1000);
+    const m = Math.floor(s/60);
+    const rem = s % 60;
+    return m + ':' + String(rem).padStart(2,'0');
+  }
+
+  /* ---------- Firebase Realtime Database storage layer ---------- */
+  function nodeUrl(path){ return dbUrl.replace(/\/$/, '') + '/' + path + '.json'; }
+
+  async function dbGet(path){
+    try{
+      const res = await fetch(nodeUrl(path));
+      if(!res.ok) return {};
+      const data = await res.json();
+      return data || {};
+    }catch(e){ return {}; }
+  }
+  async function dbPatch(path, dataObj){
+    try{
+      const res = await fetch(nodeUrl(path), { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj) });
+      return res.ok;
+    }catch(e){ return false; }
+  }
+  async function dbPut(path, dataObj){
+    try{
+      const res = await fetch(nodeUrl(path), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj) });
+      return res.ok;
+    }catch(e){ return false; }
+  }
+  async function dbDelete(path){
+    try{ const res = await fetch(nodeUrl(path), { method:'DELETE' }); return res.ok; }catch(e){ return false; }
+  }
+
+  const DEFAULT_STATE = { topic: '', phase: 'drawing', timerEnd: null, round: 'r' + Date.now() };
+  async function getState(){
+    const obj = await dbGet('state');
+    if(obj && obj.phase) return obj;
+    return { ...DEFAULT_STATE };
+  }
+  async function setState(state){ return await dbPut('state', state); }
+
+  function getVoterId(){
+    let id = window.name && window.name.startsWith('voter:') ? window.name.slice(6) : null;
+    if(!id){ id = 'v' + Math.random().toString(36).slice(2,10); window.name = 'voter:' + id; }
+    return id;
+  }
+  function getMyVoteKey(round){ return 'myvote_' + round; }
+  function getMyVote(round){ return window[getMyVoteKey(round)] || null; }
+  function setMyVote(round, submissionKey){ window[getMyVoteKey(round)] = submissionKey; }
+
+  async function fetchBoard(){
+    const obj = await dbGet('board');
+    const items = Object.keys(obj).map(k=>({ key:k, ...obj[k] }));
+    return items.sort((a,b)=>(b.ts||0)-(a.ts||0));
+  }
+  async function fetchVotes(){
+    const obj = await dbGet('votes');
+    return Object.keys(obj).map(k=>obj[k]);
+  }
+  function tallyVotes(votes){
+    const counts = {};
+    votes.forEach(v=>{ if(v && v.choice){ counts[v.choice] = (counts[v.choice]||0) + 1; } });
+    return counts;
+  }
+
+  /* ================= SETUP SCREEN (host, no pantry id yet) ================= */
+  function renderSetup(){
+    app.innerHTML = `
+      <div class="setup-wrap">
+        <div class="setup-card">
+          <h2 class="hand">One-time setup</h2>
+          <ol>
+            <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a> and sign in with any Google account.</li>
+            <li>Click <strong>Add project</strong>, give it any name, and you can skip Google Analytics.</li>
+            <li>In the left sidebar: <strong>Build → Realtime Database → Create Database</strong>. Pick any location, then choose <strong>Start in test mode</strong>.</li>
+            <li>Copy the database URL shown at the top of that page (looks like <code>https://yourproject-default-rtdb.firebaseio.com</code>).</li>
+            <li>Paste it below and click Connect.</li>
+          </ol>
+          <label style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:700;">Firebase Database URL</label>
+          <input id="pantryInput" type="text" placeholder="https://yourproject-default-rtdb.firebaseio.com">
+          <div style="margin-top:14px;"><button class="btn" id="connectBtn">Connect</button></div>
+          <div class="err" id="setupErr"></div>
+        </div>
+      </div>
+    `;
+    document.getElementById('connectBtn').addEventListener('click', ()=>{
+      let val = document.getElementById('pantryInput').value.trim();
+      if(!val){ document.getElementById('setupErr').textContent = 'Paste your Firebase Database URL first.'; return; }
+      if(!val.startsWith('http')){ document.getElementById('setupErr').textContent = 'That doesn\'t look like a URL — it should start with https://'; return; }
+      val = val.replace(/\/$/, '');
+      const url = new URL(window.location.href);
+      url.searchParams.set('db', val);
+      url.searchParams.set('host', '1');
+      window.location.href = url.toString();
+    });
+  }
+
+  /* ================= DRAW VIEW (participant) ================= */
+  let drawLastPhase = null;
+
+  function renderDrawShell(){
+    app.innerHTML = `<div class="draw-wrap" id="drawInner"></div>`;
+  }
+
+  async function drawPollLoop(){
+    const state = await getState();
+    if(state.phase !== drawLastPhase){
+      drawLastPhase = state.phase;
+      if(state.phase === 'drawing') renderDrawingPhase(state);
+      else if(state.phase === 'voting') await renderVotingPhase(state);
+      else if(state.phase === 'results') await renderResultsPhase(state);
+    } else if(state.phase === 'drawing'){
+      updateDrawTimer(state);
+    } else if(state.phase === 'voting'){
+      await renderVotingPhase(state);
+    } else if(state.phase === 'results'){
+      await renderResultsPhase(state);
+    }
+    setTimeout(drawPollLoop, POLL_MS);
+  }
+
+  function updateDrawTimer(state){
+    const el = document.getElementById('drawTimerPill');
+    if(!el) return;
+    if(!state.timerEnd){ el.style.display = 'none'; return; }
+    const remaining = state.timerEnd - Date.now();
+    el.style.display = 'inline-block';
+    el.textContent = '⏱ ' + fmtTime(remaining);
+    el.classList.toggle('low', remaining < 15000);
+  }
+
+  function renderDrawingPhase(state){
+    const inner = document.getElementById('drawInner');
+    inner.innerHTML = `
+      <div class="topic-card">
+        <div class="eyebrow">Today's topic</div>
+        <h1>${(state.topic || 'Draw whatever comes to mind!').replace(/</g,'&lt;')}</h1>
+        <div class="timer-pill" id="drawTimerPill" style="display:none;"></div>
+      </div>
+      <div class="canvas-shell">
+        <canvas id="canvas" width="${CANVAS_W}" height="${CANVAS_H}"></canvas>
+        <div class="tools">
+          <div class="swatches" id="swatches"></div>
+          <div class="sizes" id="sizes"></div>
+        </div>
+      </div>
+      <div class="name-row"><input id="nameInput" type="text" maxlength="24" placeholder="Your name (optional)"></div>
+      <div class="actions">
+        <button class="btn secondary" id="clearBtn">Clear</button>
+        <button class="btn" id="submitBtn">Add to the board</button>
+      </div>
+    `;
+    updateDrawTimer(state);
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+    const colors = ['#2b2118','#c1443c','#3b5a8a','#3e7c59','#e0a12a'];
+    let currentColor = colors[0];
+    const swatchesEl = document.getElementById('swatches');
+    colors.forEach((c,i)=>{
+      const s = document.createElement('div');
+      s.className = 'swatch' + (i===0 ? ' active' : '');
+      s.style.background = c;
+      s.addEventListener('click', ()=>{ currentColor = c; [...swatchesEl.children].forEach(el=>el.classList.remove('active')); s.classList.add('active'); });
+      swatchesEl.appendChild(s);
+    });
+    const sizes = [3,6,12];
+    let currentSize = sizes[1];
+    const sizesEl = document.getElementById('sizes');
+    sizes.forEach((sz,i)=>{
+      const b = document.createElement('div');
+      b.className = 'size-btn' + (i===1 ? ' active' : '');
+      b.innerHTML = `<span style="width:${sz}px;height:${sz}px;"></span>`;
+      b.addEventListener('click', ()=>{ currentSize = sz; [...sizesEl.children].forEach(el=>el.classList.remove('active')); b.classList.add('active'); });
+      sizesEl.appendChild(b);
+    });
+
+    let drawing=false,lastX=0,lastY=0;
+    function pos(e){ const rect=canvas.getBoundingClientRect(); const sx=canvas.width/rect.width, sy=canvas.height/rect.height; const t=e.touches?e.touches[0]:e; return {x:(t.clientX-rect.left)*sx, y:(t.clientY-rect.top)*sy}; }
+    function start(e){ e.preventDefault(); drawing=true; const p=pos(e); lastX=p.x; lastY=p.y; }
+    function move(e){ if(!drawing) return; e.preventDefault(); const p=pos(e); ctx.strokeStyle=currentColor; ctx.lineWidth=currentSize; ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke(); lastX=p.x; lastY=p.y; }
+    function end(){ drawing=false; }
+    canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+    canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); canvas.addEventListener('touchend',end);
+
+    document.getElementById('clearBtn').addEventListener('click', ()=>{ ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); });
+    document.getElementById('submitBtn').addEventListener('click', async ()=>{
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true; btn.textContent = 'Adding…';
+      const name = document.getElementById('nameInput').value.trim() || 'Anonymous';
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      const key = 'd' + Date.now() + Math.random().toString(36).slice(2,8);
+      const ok = await dbPatch('board', { [key]: { name, dataUrl, ts: Date.now() } });
+      if(!ok){ btn.disabled=false; btn.textContent='Add to the board'; showToast('Could not save — the board may be full, or check your connection.'); return; }
+      const inner = document.getElementById('drawInner');
+      inner.innerHTML = `<div class="confirm"><div class="stamp">📌</div><h2>Added to the board!</h2><p>Your drawing just showed up on the big screen.</p><div style="margin-top:22px;"><button class="btn" id="drawAgain">Draw another</button></div></div>`;
+      document.getElementById('drawAgain').addEventListener('click', ()=> renderDrawingPhase(state));
+    });
+  }
+
+  async function renderVotingPhase(state){
+    const round = state.round;
+    const myVote = getMyVote(round);
+    const submissions = await fetchBoard();
+    const votes = await fetchVotes();
+    const counts = tallyVotes(votes);
+    const inner = document.getElementById('drawInner');
+    if(!inner) return;
+    inner.innerHTML = `
+      <div class="topic-card">
+        <div class="eyebrow">Voting is open</div>
+        <h1>Pick your favorite!</h1>
+      </div>
+      <div class="vote-grid" id="voteGrid"></div>
+    `;
+    const grid = document.getElementById('voteGrid');
+    if(submissions.length === 0){
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--ink-soft);">No drawings were submitted this round.</div>';
+      return;
+    }
+    submissions.forEach(item=>{
+      const card = document.createElement('div');
+      card.className = 'vote-card' + (myVote === item.key ? ' chosen' : '');
+      card.innerHTML = `
+        <img src="${item.dataUrl}" alt="Drawing by ${item.name}">
+        <div class="who">${item.name}</div>
+        <button class="vote-btn" ${myVote ? 'disabled' : ''}>${myVote === item.key ? 'Voted ✓' : (myVote ? 'Voting closed' : 'Vote for this')}</button>
+      `;
+      const btn = card.querySelector('.vote-btn');
+      if(!myVote){
+        btn.addEventListener('click', async ()=>{
+          btn.disabled = true; btn.textContent = 'Saving…';
+          const voterId = getVoterId();
+          const ok = await dbPatch('votes', { [voterId]: { choice: item.key, ts: Date.now() } });
+          if(!ok){ showToast('Vote did not save — try again.'); btn.disabled=false; btn.textContent='Vote for this'; return; }
+          setMyVote(round, item.key);
+          renderVotingPhase(state);
+        });
+      }
+      grid.appendChild(card);
+    });
+  }
+
+  async function renderResultsPhase(state){
+    const submissions = await fetchBoard();
+    const votes = await fetchVotes();
+    const counts = tallyVotes(votes);
+    const ranked = [...submissions].sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0));
+    const topCount = ranked.length ? (counts[ranked[0].key]||0) : 0;
+    const inner = document.getElementById('drawInner');
+    if(!inner) return;
+    inner.innerHTML = `
+      <div class="topic-card"><div class="eyebrow">Results</div><h1>🏆 Top drawings</h1></div>
+      <div class="vote-grid" id="resultsGrid"></div>
+    `;
+    const grid = document.getElementById('resultsGrid');
+    if(ranked.length === 0){ grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--ink-soft);">No drawings this round.</div>'; return; }
+    ranked.forEach(item=>{
+      const c = counts[item.key] || 0;
+      const card = document.createElement('div');
+      card.className = 'vote-card';
+      card.innerHTML = `
+        ${c === topCount && topCount > 0 ? '<div class="crown">👑</div>' : ''}
+        <img src="${item.dataUrl}" alt="Drawing by ${item.name}">
+        <div class="who">${item.name}</div>
+        <div class="vote-count">${c} vote${c===1?'':'s'}</div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  /* ================= HOST VIEW ================= */
+  async function renderHostView(){
+    app.innerHTML = `
+      <div class="host-wrap">
+        <div class="host-top">
+          <div class="qr-box">
+            <div class="eyebrow">Scan to draw</div>
+            <div id="qrcode"></div>
+            <div class="hint">No app, no login — opens straight to the canvas.</div>
+          </div>
+          <div class="control-panel">
+            <label>Topic</label>
+            <input id="topicInput" type="text" maxlength="60" placeholder="e.g. Draw your favorite animal">
+            <div class="control-row">
+              <button class="btn small" id="saveTopicBtn">Update topic</button>
+              <button class="btn secondary small" id="downloadBtn">Download board image</button>
+            </div>
+            <div class="control-row">
+              <label style="text-transform:none;font-weight:600;">Timer</label>
+              <input id="minutesInput" type="number" min="1" max="60" value="3"> min
+              <button class="btn small" id="startTimerBtn">Start drawing timer</button>
+            </div>
+            <div class="phase-row">
+              <div>
+                <span class="phase-badge" id="phaseBadge">drawing</span>
+                <span class="host-timer" id="hostTimer" style="margin-left:10px;"></span>
+              </div>
+              <div class="control-row" style="margin:0;">
+                <button class="btn small" id="votingBtn">Open voting</button>
+                <button class="btn small" id="resultsBtn">Show results</button>
+                <button class="btn secondary small" id="newRoundBtn">New round</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="board-header"><h1 class="hand">The board</h1><div class="count" id="countText">0 drawings</div></div>
+        <div id="board"></div>
+        <div class="empty-state" id="emptyState" style="display:none;"><div class="hand">Nothing here yet — scan the QR code to add the first drawing!</div></div>
+      </div>
+    `;
+
+    try {
+      new QRCode(document.getElementById('qrcode'), { text: participantUrl(), width: 150, height: 150, colorDark: '#2b2118', colorLight: '#fffdf6' });
+    } catch(e){ document.getElementById('qrcode').textContent = participantUrl(); }
+
+    document.getElementById('saveTopicBtn').addEventListener('click', async ()=>{
+      const val = document.getElementById('topicInput').value.trim();
+      const state = await getState();
+      state.topic = val;
+      const ok = await setState(state);
+      if(!ok) showToast('Could not update topic — check your connection.');
+    });
+    document.getElementById('startTimerBtn').addEventListener('click', async ()=>{
+      const mins = Math.max(1, parseInt(document.getElementById('minutesInput').value, 10) || 3);
+      const state = await getState();
+      state.phase = 'drawing';
+      state.timerEnd = Date.now() + mins*60000;
+      await setState(state);
+    });
+    document.getElementById('votingBtn').addEventListener('click', async ()=>{
+      const state = await getState();
+      state.phase = 'voting'; state.timerEnd = null;
+      await setState(state);
+    });
+    document.getElementById('resultsBtn').addEventListener('click', async ()=>{
+      const state = await getState();
+      state.phase = 'results';
+      await setState(state);
+    });
+    document.getElementById('newRoundBtn').addEventListener('click', async ()=>{
+      if(!confirm('Start a fresh round? This clears every drawing and vote from the board.')) return;
+      await dbDelete('board');
+      await dbDelete('votes');
+      const state = await getState();
+      state.phase = 'drawing'; state.timerEnd = null; state.round = 'r' + Date.now();
+      await setState(state);
+    });
+    document.getElementById('downloadBtn').addEventListener('click', ()=>{
+      html2canvas(document.querySelector('.host-wrap'), {backgroundColor:null, scale:2}).then(canvas=>{
+        const link = document.createElement('a');
+        link.download = 'topic-drawing-board.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      }).catch(()=>{ showToast('Could not capture the board image — try a regular screenshot instead.'); });
+    });
+
+    hostPollLoop();
+  }
+
+  async function hostPollLoop(){
+    const state = await getState();
+    document.getElementById('topicInput').value = state.topic || '';
+    const badge = document.getElementById('phaseBadge');
+    badge.textContent = state.phase;
+    badge.className = 'phase-badge ' + state.phase;
+
+    const timerEl = document.getElementById('hostTimer');
+    if(state.phase === 'drawing' && state.timerEnd){
+      const remaining = state.timerEnd - Date.now();
+      timerEl.textContent = fmtTime(remaining);
+      timerEl.style.color = remaining < 15000 ? 'var(--pin-red)' : 'var(--ink)';
+      if(remaining <= 0){
+        state.phase = 'voting'; state.timerEnd = null;
+        await setState(state);
+      }
+    } else {
+      timerEl.textContent = '';
+    }
+
+    await refreshHostBoard(state);
+    setTimeout(hostPollLoop, POLL_MS);
+  }
+
+  async function refreshHostBoard(state){
+    const boardEl = document.getElementById('board');
+    const emptyEl = document.getElementById('emptyState');
+    const countEl = document.getElementById('countText');
+    const submissions = await fetchBoard();
+
+    if(submissions.length === 0){
+      boardEl.innerHTML = ''; emptyEl.style.display = 'block'; countEl.textContent = '0 drawings';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    countEl.textContent = submissions.length + (submissions.length===1 ? ' drawing' : ' drawings');
+
+    let counts = {};
+    let ordered = submissions;
+    if(state.phase === 'voting' || state.phase === 'results'){
+      const votes = await fetchVotes();
+      counts = tallyVotes(votes);
+      if(state.phase === 'results'){
+        ordered = [...submissions].sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0));
+      }
+    }
+    const topCount = state.phase==='results' && ordered.length ? (counts[ordered[0].key]||0) : -1;
+    const pinColors = ['#c1443c','#3e7c59','#3b5a8a','#e0a12a'];
+
+    boardEl.innerHTML = ordered.map(item=>{
+      const h = hashCode(item.key);
+      const rotate = (h % 12) - 6;
+      const pin = pinColors[Math.abs(h) % pinColors.length];
+      const name = (item.name || 'Anonymous').replace(/</g,'&lt;');
+      const isWinner = state.phase === 'results' && topCount > 0 && (counts[item.key]||0) === topCount;
+      const voteBadge = (state.phase === 'voting' || state.phase === 'results') ? `<div class="votes-badge">${counts[item.key]||0}</div>` : '';
+      return `
+        <div class="pin-card${isWinner ? ' winner' : ''}" style="transform:rotate(${rotate}deg);">
+          <div class="pin-dot" style="background:${pin};"></div>
+          <img src="${item.dataUrl}" alt="Drawing by ${name}">
+          <div class="who">${name}</div>
+          ${voteBadge}
+        </div>
+      `;
+    }).join('');
+  }
+
+  /* ================= ROUTER ================= */
+  if(!dbUrl){
+    if(isHost){ renderSetup(); }
+    else { app.innerHTML = '<div class="setup-wrap"><div class="setup-card"><h2 class="hand">Ask your host for the QR code</h2><p>This link is missing its board address.</p></div></div>'; }
+  } else if(isHost){
+    renderHostView();
+  } else {
+    renderDrawShell();
+    drawPollLoop();
+  }
+})();
+</script>
+</body>
+</html>
