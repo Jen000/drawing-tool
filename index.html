@@ -17,7 +17,7 @@
     --accent:#3e7c59; --accent-dark:#2e5d43;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:#f4ece0;font-family:'Inter',sans-serif;color:var(--ink);min-height:100vh;}
+  html,body{margin:0;padding:0;background:#f4ece0;font-family:'Inter',sans-serif;color:var(--ink);height:100%;}
   h1,h2,.hand{font-family:'Kalam',cursive;}
   button{font-family:'Inter',sans-serif;cursor:pointer;border:none;}
   .btn{padding:12px 22px;border-radius:10px;font-weight:600;font-size:15px;background:var(--accent);color:#fff;transition:transform .12s ease, background .12s ease;}
@@ -42,17 +42,6 @@
   .topic-card h1{font-size:26px;margin:4px 0 0;line-height:1.15;color:var(--ink);}
   .timer-pill{display:inline-block;margin-top:10px;padding:6px 14px;border-radius:999px;background:#f1e9d8;font-weight:700;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
   .timer-pill.low{background:#f6d9d6;color:var(--pin-red);}
-  .canvas-shell{background:var(--paper);border-radius:14px;padding:10px;box-shadow:0 6px 0 rgba(0,0,0,0.08);}
-  canvas{display:block;width:100%;aspect-ratio:4/3;background:#fff;border-radius:8px;touch-action:none;border:1px dashed #e3d9c4;}
-  .tools{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-top:12px;flex-wrap:wrap;}
-  .swatches{display:flex;gap:8px;}
-  .swatch{width:28px;height:28px;border-radius:50%;border:2px solid transparent;cursor:pointer;}
-  .swatch.active{border-color:var(--ink);transform:scale(1.1);}
-  .sizes{display:flex;gap:6px;}
-  .size-btn{width:32px;height:32px;border-radius:8px;background:#f1e9d8;display:flex;align-items:center;justify-content:center;}
-  .size-btn.active{background:var(--accent);}
-  .size-btn span{border-radius:50%;background:var(--ink);display:block;}
-  .size-btn.active span{background:#fff;}
   .name-row{margin-top:14px;}
   .name-row input{width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid #d8cdb8;font-family:'Inter',sans-serif;font-size:14px;background:var(--paper);}
   .actions{display:flex;gap:10px;margin-top:14px;}
@@ -61,6 +50,32 @@
   .confirm .stamp{font-size:52px;}
   .confirm h2{font-size:26px;margin:10px 0 4px;}
   .confirm p{color:var(--ink-soft);font-size:14px;}
+
+  /* ---- clean full-height drawing screen ---- */
+  .draw-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:#fff;}
+  .db-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--paper);border-bottom:1px solid #ece1cd;flex:0 0 auto;}
+  .db-top .topic-text{font-family:'Kalam',cursive;font-size:19px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .db-top .eyebrow{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;display:block;}
+  .canvas-area{flex:1 1 auto;position:relative;min-height:0;background:#fafafa;}
+  .canvas-area canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;}
+  #canvas{background:#fff;}
+  .db-toolbar{flex:0 0 auto;background:var(--paper);border-top:1px solid #ece1cd;padding:8px 10px;}
+  .tool-row{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:4px 2px;}
+  .tool-row + .tool-row{margin-top:2px;}
+  .swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;flex:0 0 auto;}
+  .swatch.active{border-color:var(--ink);transform:scale(1.12);}
+  .color-picker-wrap{position:relative;width:26px;height:26px;flex:0 0 auto;border-radius:50%;overflow:hidden;border:2px dashed #c9bda4;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);}
+  .color-picker-wrap input{position:absolute;inset:-4px;width:34px;height:34px;border:none;padding:0;cursor:pointer;opacity:0;}
+  .mode-btn{flex:0 0 auto;padding:7px 11px;border-radius:8px;background:#f1e9d8;font-size:12px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+  .mode-btn.active{background:var(--accent);color:#fff;}
+  .size-btn{width:30px;height:30px;border-radius:8px;background:#f1e9d8;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .size-btn.active{background:var(--accent);}
+  .size-btn span{border-radius:50%;background:var(--ink);display:block;}
+  .size-btn.active span{background:#fff;}
+  .divider{width:1px;align-self:stretch;background:#e3d9c4;flex:0 0 auto;margin:0 2px;}
+  .db-bottom{display:flex;gap:8px;padding:8px 10px 10px;}
+  .db-bottom input{flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid #d8cdb8;font-size:13px;min-width:0;}
+  .db-bottom .btn{padding:10px 16px;font-size:13px;white-space:nowrap;}
 
   .vote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;margin-top:16px;}
   .vote-card{background:var(--paper);border-radius:10px;padding:8px 8px 10px;box-shadow:0 4px 0 rgba(0,0,0,0.08);text-align:center;position:relative;}
@@ -114,7 +129,6 @@
   const dbUrl = params.get('db');
   const app = document.getElementById('app');
   const POLL_MS = 4000;
-  const CANVAS_W = 400, CANVAS_H = 300;
 
   function showToast(msg){
     const t = document.createElement('div');
@@ -233,7 +247,7 @@
   let drawLastPhase = null;
 
   function renderDrawShell(){
-    app.innerHTML = `<div class="draw-wrap" id="drawInner"></div>`;
+    app.innerHTML = `<div id="drawInner"></div>`;
   }
 
   async function drawPollLoop(){
@@ -263,77 +277,181 @@
     el.classList.toggle('low', remaining < 15000);
   }
 
+  function starPath(ctx, cx, cy, outerR, innerR){
+    const spikes = 5;
+    let rot = Math.PI/2*3;
+    const step = Math.PI/spikes;
+    ctx.moveTo(cx, cy - outerR);
+    for(let i=0;i<spikes;i++){
+      let x = cx + Math.cos(rot)*outerR, y = cy + Math.sin(rot)*outerR;
+      ctx.lineTo(x,y); rot += step;
+      x = cx + Math.cos(rot)*innerR; y = cy + Math.sin(rot)*innerR;
+      ctx.lineTo(x,y); rot += step;
+    }
+    ctx.lineTo(cx, cy - outerR);
+    ctx.closePath();
+  }
+
+  function drawShape(ctx, mode, x0, y0, x1, y1, color, lineWidth, filled){
+    const x = Math.min(x0,x1), y = Math.min(y0,y1), w = Math.abs(x1-x0), h = Math.abs(y1-y0);
+    ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = lineWidth;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath();
+    if(mode === 'line'){ ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke(); return; }
+    if(mode === 'rect'){ ctx.rect(x,y,w,h); }
+    else if(mode === 'circle'){ ctx.ellipse(x+w/2, y+h/2, Math.max(w/2,1), Math.max(h/2,1), 0, 0, Math.PI*2); }
+    else if(mode === 'triangle'){ ctx.moveTo(x+w/2,y); ctx.lineTo(x+w,y+h); ctx.lineTo(x,y+h); ctx.closePath(); }
+    else if(mode === 'star'){ starPath(ctx, x+w/2, y+h/2, Math.max(Math.min(w,h)/2,1), Math.max(Math.min(w,h)/4,1)); }
+    if(filled) ctx.fill();
+    ctx.stroke();
+  }
+
   function renderDrawingPhase(state){
     const inner = document.getElementById('drawInner');
     inner.innerHTML = `
-      <div class="topic-card">
-        <div class="eyebrow">Today's topic</div>
-        <h1>${(state.topic || 'Draw whatever comes to mind!').replace(/</g,'&lt;')}</h1>
-        <div class="timer-pill" id="drawTimerPill" style="display:none;"></div>
-      </div>
-      <div class="canvas-shell">
-        <canvas id="canvas" width="${CANVAS_W}" height="${CANVAS_H}"></canvas>
-        <div class="tools">
-          <div class="swatches" id="swatches"></div>
-          <div class="sizes" id="sizes"></div>
+      <div class="draw-shell">
+        <div class="db-top">
+          <div style="min-width:0;">
+            <span class="eyebrow">Topic</span>
+            <div class="topic-text">${(state.topic || 'Draw whatever comes to mind!').replace(/</g,'&lt;')}</div>
+          </div>
+          <div class="timer-pill" id="drawTimerPill" style="display:none;"></div>
         </div>
-      </div>
-      <div class="name-row"><input id="nameInput" type="text" maxlength="24" placeholder="Your name (optional)"></div>
-      <div class="actions">
-        <button class="btn secondary" id="clearBtn">Clear</button>
-        <button class="btn" id="submitBtn">Add to the board</button>
+        <div class="canvas-area">
+          <canvas id="canvas"></canvas>
+          <canvas id="overlay"></canvas>
+        </div>
+        <div class="db-toolbar">
+          <div class="tool-row" id="colorRow"></div>
+          <div class="tool-row" id="modeRow"></div>
+        </div>
+        <div class="db-bottom">
+          <input id="nameInput" type="text" maxlength="24" placeholder="Your name (optional)">
+          <button class="btn secondary" id="clearBtn">Clear</button>
+          <button class="btn" id="submitBtn">Add</button>
+        </div>
       </div>
     `;
     updateDrawTimer(state);
 
+    const canvasArea = inner.querySelector('.canvas-area');
     const canvas = document.getElementById('canvas');
+    const overlay = document.getElementById('overlay');
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height);
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const octx = overlay.getContext('2d');
 
-    const colors = ['#2b2118','#c1443c','#3b5a8a','#3e7c59','#e0a12a'];
+    function sizeCanvases(){
+      const rect = canvasArea.getBoundingClientRect();
+      const w = Math.max(1, Math.round(rect.width));
+      const h = Math.max(1, Math.round(rect.height));
+      [canvas, overlay].forEach(c=>{ c.width = w; c.height = h; });
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,w,h);
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    }
+    sizeCanvases();
+
+    const colors = ['#2b2118','#ffffff','#c1443c','#e0743c','#e0a12a','#e8d24a','#5fae5f','#3e7c59','#3ba3a3','#3b5a8a','#6a4fb0','#c15a9e','#8a5a3c'];
     let currentColor = colors[0];
-    const swatchesEl = document.getElementById('swatches');
+    const colorRow = document.getElementById('colorRow');
     colors.forEach((c,i)=>{
       const s = document.createElement('div');
       s.className = 'swatch' + (i===0 ? ' active' : '');
       s.style.background = c;
-      s.addEventListener('click', ()=>{ currentColor = c; [...swatchesEl.children].forEach(el=>el.classList.remove('active')); s.classList.add('active'); });
-      swatchesEl.appendChild(s);
+      if(c === '#ffffff') s.style.boxShadow = 'inset 0 0 0 1px #ddd';
+      s.addEventListener('click', ()=>{ currentColor = c; [...colorRow.querySelectorAll('.swatch')].forEach(el=>el.classList.remove('active')); s.classList.add('active'); });
+      colorRow.appendChild(s);
     });
-    const sizes = [3,6,12];
+    const pickerWrap = document.createElement('div');
+    pickerWrap.className = 'color-picker-wrap';
+    pickerWrap.innerHTML = `<input type="color" id="customColor" value="#2b2118">`;
+    colorRow.appendChild(pickerWrap);
+    document.getElementById('customColor').addEventListener('input', (e)=>{
+      currentColor = e.target.value;
+      [...colorRow.querySelectorAll('.swatch')].forEach(el=>el.classList.remove('active'));
+    });
+
+    const modeRow = document.getElementById('modeRow');
+    const modes = [
+      {id:'pen', label:'✏️ Pen'},
+      {id:'line', label:'／ Line'},
+      {id:'rect', label:'▭ Rect'},
+      {id:'circle', label:'◯ Circle'},
+      {id:'triangle', label:'△ Triangle'},
+      {id:'star', label:'★ Star'}
+    ];
+    let currentMode = 'pen';
+    modes.forEach((m,i)=>{
+      const b = document.createElement('div');
+      b.className = 'mode-btn' + (i===0 ? ' active' : '');
+      b.textContent = m.label;
+      b.addEventListener('click', ()=>{ currentMode = m.id; [...modeRow.querySelectorAll('.mode-btn')].forEach(el=>el.classList.remove('active')); b.classList.add('active'); });
+      modeRow.appendChild(b);
+    });
+    const divider1 = document.createElement('div'); divider1.className = 'divider'; modeRow.appendChild(divider1);
+
+    let fillMode = false;
+    const fillBtn = document.createElement('div');
+    fillBtn.className = 'mode-btn';
+    fillBtn.textContent = '⬛ Fill';
+    fillBtn.addEventListener('click', ()=>{ fillMode = !fillMode; fillBtn.classList.toggle('active', fillMode); });
+    modeRow.appendChild(fillBtn);
+    const divider2 = document.createElement('div'); divider2.className = 'divider'; modeRow.appendChild(divider2);
+
+    const sizes = [3,7,14];
     let currentSize = sizes[1];
-    const sizesEl = document.getElementById('sizes');
     sizes.forEach((sz,i)=>{
       const b = document.createElement('div');
       b.className = 'size-btn' + (i===1 ? ' active' : '');
       b.innerHTML = `<span style="width:${sz}px;height:${sz}px;"></span>`;
-      b.addEventListener('click', ()=>{ currentSize = sz; [...sizesEl.children].forEach(el=>el.classList.remove('active')); b.classList.add('active'); });
-      sizesEl.appendChild(b);
+      b.addEventListener('click', ()=>{ currentSize = sz; [...modeRow.querySelectorAll('.size-btn')].forEach(el=>el.classList.remove('active')); b.classList.add('active'); });
+      modeRow.appendChild(b);
     });
 
-    let drawing=false,lastX=0,lastY=0;
-    function pos(e){ const rect=canvas.getBoundingClientRect(); const sx=canvas.width/rect.width, sy=canvas.height/rect.height; const t=e.touches?e.touches[0]:e; return {x:(t.clientX-rect.left)*sx, y:(t.clientY-rect.top)*sy}; }
-    function start(e){ e.preventDefault(); drawing=true; const p=pos(e); lastX=p.x; lastY=p.y; }
-    function move(e){ if(!drawing) return; e.preventDefault(); const p=pos(e); ctx.strokeStyle=currentColor; ctx.lineWidth=currentSize; ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke(); lastX=p.x; lastY=p.y; }
-    function end(){ drawing=false; }
-    canvas.addEventListener('mousedown',start); canvas.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
-    canvas.addEventListener('touchstart',start,{passive:false}); canvas.addEventListener('touchmove',move,{passive:false}); canvas.addEventListener('touchend',end);
+    let drawing=false, startX=0, startY=0, lastX=0, lastY=0;
+    function pos(e){ const rect=overlay.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:(t.clientX-rect.left), y:(t.clientY-rect.top)}; }
+    function start(e){
+      e.preventDefault(); drawing=true;
+      const p=pos(e); startX=p.x; startY=p.y; lastX=p.x; lastY=p.y;
+    }
+    function move(e){
+      if(!drawing) return; e.preventDefault();
+      const p=pos(e);
+      if(currentMode === 'pen'){
+        ctx.strokeStyle=currentColor; ctx.lineWidth=currentSize;
+        ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke();
+        lastX=p.x; lastY=p.y;
+      } else {
+        octx.clearRect(0,0,overlay.width,overlay.height);
+        drawShape(octx, currentMode, startX, startY, p.x, p.y, currentColor, currentSize, fillMode);
+      }
+    }
+    function end(e){
+      if(!drawing) return;
+      if(currentMode !== 'pen'){
+        const p = pos(e.changedTouches ? {touches:e.changedTouches} : e);
+        drawShape(ctx, currentMode, startX, startY, p.x, p.y, currentColor, currentSize, fillMode);
+        octx.clearRect(0,0,overlay.width,overlay.height);
+      }
+      drawing=false;
+    }
+    overlay.addEventListener('mousedown',start); overlay.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
+    overlay.addEventListener('touchstart',start,{passive:false}); overlay.addEventListener('touchmove',move,{passive:false}); overlay.addEventListener('touchend',end);
 
     document.getElementById('clearBtn').addEventListener('click', ()=>{ ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); });
     document.getElementById('submitBtn').addEventListener('click', async ()=>{
       const btn = document.getElementById('submitBtn');
-      btn.disabled = true; btn.textContent = 'Adding…';
+      btn.disabled = true; btn.textContent = '…';
       const name = document.getElementById('nameInput').value.trim() || 'Anonymous';
       const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
       const key = 'd' + Date.now() + Math.random().toString(36).slice(2,8);
       const ok = await dbPatch('board', { [key]: { name, dataUrl, ts: Date.now() } });
-      if(!ok){ btn.disabled=false; btn.textContent='Add to the board'; showToast('Could not save — the board may be full, or check your connection.'); return; }
-      const inner = document.getElementById('drawInner');
-      inner.innerHTML = `<div class="confirm"><div class="stamp">📌</div><h2>Added to the board!</h2><p>Your drawing just showed up on the big screen.</p><div style="margin-top:22px;"><button class="btn" id="drawAgain">Draw another</button></div></div>`;
+      if(!ok){ btn.disabled=false; btn.textContent='Add'; showToast('Could not save — the board may be full, or check your connection.'); return; }
+      const inner2 = document.getElementById('drawInner');
+      inner2.innerHTML = `<div class="draw-wrap"><div class="confirm"><div class="stamp">📌</div><h2>Added to the board!</h2><p>Your drawing just showed up on the big screen.</p><div style="margin-top:22px;"><button class="btn" id="drawAgain">Draw another</button></div></div></div>`;
       document.getElementById('drawAgain').addEventListener('click', ()=> renderDrawingPhase(state));
     });
   }
+
 
   async function renderVotingPhase(state){
     const round = state.round;
@@ -344,11 +462,13 @@
     const inner = document.getElementById('drawInner');
     if(!inner) return;
     inner.innerHTML = `
-      <div class="topic-card">
-        <div class="eyebrow">Voting is open</div>
-        <h1>Pick your favorite!</h1>
+      <div class="draw-wrap">
+        <div class="topic-card">
+          <div class="eyebrow">Voting is open</div>
+          <h1>Pick your favorite!</h1>
+        </div>
+        <div class="vote-grid" id="voteGrid"></div>
       </div>
-      <div class="vote-grid" id="voteGrid"></div>
     `;
     const grid = document.getElementById('voteGrid');
     if(submissions.length === 0){
@@ -387,8 +507,10 @@
     const inner = document.getElementById('drawInner');
     if(!inner) return;
     inner.innerHTML = `
-      <div class="topic-card"><div class="eyebrow">Results</div><h1>🏆 Top drawings</h1></div>
-      <div class="vote-grid" id="resultsGrid"></div>
+      <div class="draw-wrap">
+        <div class="topic-card"><div class="eyebrow">Results</div><h1>🏆 Top drawings</h1></div>
+        <div class="vote-grid" id="resultsGrid"></div>
+      </div>
     `;
     const grid = document.getElementById('resultsGrid');
     if(ranked.length === 0){ grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--ink-soft);">No drawings this round.</div>'; return; }
