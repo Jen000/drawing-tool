@@ -584,6 +584,11 @@
   const params = new URLSearchParams(window.location.search);
   const isHost = params.get('host') === '1';
 
+  /* Board codes are short and typed by humans, so accept any case. Older
+     long-form ids are left exactly as they are. */
+  const rawBoard = (params.get('b') || '').trim();
+  const boardId = rawBoard.length && rawBoard.length <= 8 ? rawBoard.toUpperCase() : rawBoard;
+
   /* Someone can point this copy at their own Firebase from Settings; it is kept
      on their device only. A URL parameter still wins, for one-off links. */
   const BACKEND_KEY = 'drawTopicBackend';
@@ -599,14 +604,19 @@
     }catch(e){ return false; }
   }
   const backend = savedBackend();
-  const usingOwnBackend = !!(backend && backend.dbUrl && !params.get('db'));
-  const dbUrl = params.get('db') || (backend && backend.dbUrl) || BUILT_IN.dbUrl || '';
-  const apiKey = params.get('key') || (backend && backend.apiKey) || BUILT_IN.apiKey || '';
-
-  /* Board codes are short and typed by humans, so accept any case. Older
-     long-form ids are left exactly as they are. */
-  const rawBoard = (params.get('b') || '').trim();
-  const boardId = rawBoard.length && rawBoard.length <= 8 ? rawBoard.toUpperCase() : rawBoard;
+  /* A plain board link (?b=CODE, no host=1, no explicit db=) always means the
+     shared backend - that is the entire point of short codes. Without this
+     guard, a device that had ever set up its own Firebase in Settings would
+     try to look up every board code it ever opens inside that project instead
+     of the shared one, and simply never find anything. Second-screen links
+     (?screen=1) are exempt: that route is only ever opened by the host, on
+     the host's own device, to put a second window on the projector - never
+     handed to a guest - so it should keep following whatever backend this
+     browser is already using. */
+  const joiningPlainLink = !!boardId && !isHost && params.get('screen') !== '1' && !params.get('db');
+  const usingOwnBackend = !!(backend && backend.dbUrl && !params.get('db') && !joiningPlainLink);
+  const dbUrl = params.get('db') || (!joiningPlainLink && backend && backend.dbUrl) || BUILT_IN.dbUrl || '';
+  const apiKey = params.get('key') || (!joiningPlainLink && backend && backend.apiKey) || BUILT_IN.apiKey || '';
 
   const app = document.getElementById('app');
   const POLL_MS = 4000;
@@ -643,6 +653,17 @@
   function participantUrl(){
     const url = new URL(window.location.href);
     url.searchParams.delete('host');
+    /* Never hand a guest the screen=1 view by accident - this is called from
+       the standalone second-screen route too, whose own address carries it. */
+    url.searchParams.delete('screen');
+    /* A board on a personal backend needs db/key spelled out: a bare code
+       now always resolves to the shared one (see joiningPlainLink above), so
+       without this a guest link for an own-backend board would send every
+       guest looking in the wrong project. */
+    if(usingOwnBackend){
+      url.searchParams.set('db', dbUrl);
+      url.searchParams.set('key', apiKey);
+    }
     return url.toString();
   }
   function hashCode(str){ let h=0; for(let i=0;i<str.length;i++){ h=(h<<5)-h+str.charCodeAt(i); h|=0; } return h; }
@@ -1249,12 +1270,19 @@
     if(showJoin && !screenQrDone){
       const guestLink = participantUrl();
       screenQrDone = paintQr(document.getElementById('screenQr'), guestLink, 190);
-      const where = window.location.origin + window.location.pathname;
-      document.getElementById('screenWhere').textContent =
-        where.replace(/^https?:\/\//, '').replace(/index\.html$/, '');
       const codeEl = document.getElementById('screenCode');
-      codeEl.textContent = looksLikeCode(boardId) ? boardId : '';
-      codeEl.style.display = looksLikeCode(boardId) ? '' : 'none';
+      if(usingOwnBackend){
+        /* A short code cannot carry which Firebase project to look in, so on
+           a personal backend the readable fallback has to be the full link. */
+        document.getElementById('screenWhere').textContent = guestLink.replace(/^https?:\/\//, '');
+        codeEl.textContent = ''; codeEl.style.display = 'none';
+      } else {
+        const where = window.location.origin + window.location.pathname;
+        document.getElementById('screenWhere').textContent =
+          where.replace(/^https?:\/\//, '').replace(/index\.html$/, '');
+        codeEl.textContent = looksLikeCode(boardId) ? boardId : '';
+        codeEl.style.display = looksLikeCode(boardId) ? '' : 'none';
+      }
     }
 
     const submissions = await fetchBoard(state);
@@ -1638,6 +1666,10 @@
     function leave(){
       const url = new URL(window.location.href);
       url.searchParams.delete('b');
+      /* Settings is checked before isHost in the router, so leaving it without
+         also clearing this param bounces straight back to Settings instead of
+         reaching sign-in. */
+      url.searchParams.delete('settings');
       url.searchParams.set('host', '1');
       window.location.href = url.toString();
     }
@@ -2552,7 +2584,12 @@
     /* Read-it-off-the-screen fallback for anyone whose camera won't cooperate. */
     const joinHint = document.getElementById('joinHint');
     if(joinHint){
-      if(looksLikeCode(boardId)){
+      if(usingOwnBackend){
+        /* On a personal backend the code alone means nothing to a stranger's
+           device - only the full link (with db/key) actually resolves. */
+        joinHint.innerHTML = `<div class="join-or">can't scan? open this</div>
+          <div class="join-where">${esc(participantUrl().replace(/^https?:\/\//, ''))}</div>`;
+      } else if(looksLikeCode(boardId)){
         const short = window.location.origin + window.location.pathname;
         joinHint.innerHTML = `<div class="join-or">or go to</div>
           <div class="join-where">${esc(short.replace(/^https?:\/\//, '').replace(/index\.html$/, ''))}</div>
