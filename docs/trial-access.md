@@ -91,5 +91,16 @@ rather than failing silently.
 ## Bringing your own
 
 **Settings**, from the board list or `?settings=1`, takes a database URL and API
-key and stores them on that device. From then on the app talks to that project
-instead, so no code, allowance or limit applies. Reverting is one button.
+key. When you are signed in on the shared instance, saving there does two
+things: it links the database to your account (a small record under
+`/users/<uid>/ownBackend` on the shared project, readable only by you) and
+caches it on this device. Sign in with the same email and password on any other
+device and it is applied automatically — nothing to retype.
+
+Once a device has switched to your own database, board data and hosting happen
+there, using its own sign-in. Settings on that device can only update its local
+copy; changing or removing the link itself needs to happen from the shared
+instance, since that is the only place your account record lives.
+**Switch to the shared database** clears the device's local override without
+touching the link, and **Unlink my account**, shown once you are back on the
+shared instance, removes it for good.
