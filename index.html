@@ -126,12 +126,20 @@
   .timer-pill.low{background:rgba(229,72,77,.12);color:var(--danger);border-color:rgba(229,72,77,.3);}
 
   .canvas-area{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px;background:var(--surface-2);}
-  .canvas-stage{
+  .canvas-viewport{
     position:relative;flex:0 0 auto;width:280px;height:280px;
     border-radius:16px;overflow:hidden;background:#fff;
     box-shadow:var(--shadow-md);border:1px solid var(--line);
+    touch-action:none;
   }
+  .canvas-stage{position:absolute;top:0;left:0;width:100%;height:100%;transform-origin:0 0;}
   .canvas-stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;}
+  .zoom-pill{
+    position:absolute;top:8px;right:8px;pointer-events:none;
+    background:rgba(15,23,41,.72);color:#fff;font-size:11px;font-weight:700;
+    padding:3px 9px;border-radius:999px;opacity:0;transition:opacity .25s ease;
+  }
+  .zoom-pill.show{opacity:1;}
 
   .db-toolbar{flex:0 0 auto;background:var(--surface);border-top:1px solid var(--line);padding:10px 10px 4px;}
   .tool-row{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:2px;scrollbar-width:none;}
@@ -156,6 +164,7 @@
   .tool-btn:hover{color:var(--ink);}
   .tool-btn.active{background:var(--accent);color:#fff;}
   .tool-btn.disabled{opacity:.4;pointer-events:none;}
+  .zoom-btn{min-width:34px;text-align:center;font-size:15px;line-height:1;padding:8px 10px;}
   .size-btn{width:32px;height:32px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
   .size-btn span{border-radius:50%;background:var(--ink-soft);display:block;}
   .size-btn.active{background:var(--accent);}
@@ -221,6 +230,16 @@
     letter-spacing:.14em;color:#fff;margin-top:3px;
   }
 
+  .landing-mark{font-size:40px;line-height:1;margin-bottom:6px;}
+  .landing-block{text-align:left;}
+  .landing-label{font-weight:700;font-size:15px;margin-bottom:2px;}
+  .landing-hint{color:var(--ink-soft);font-size:13.5px;margin:0 0 12px;line-height:1.5;}
+  .landing-go{width:100%;margin-top:12px;}
+  .landing-split{
+    display:flex;align-items:center;gap:12px;margin:22px 0;
+    color:var(--ink-soft);font-size:12px;text-transform:uppercase;letter-spacing:.1em;font-weight:600;
+  }
+  .landing-split::before,.landing-split::after{content:"";flex:1;height:1px;background:var(--line);}
   .join-card{text-align:center;}
   .join-card h2{margin-bottom:6px;}
   .join-input{
@@ -1418,34 +1437,53 @@
 
   function timerRemaining(){
     const s = latestState;
-    if(!s || s.phase !== 'drawing' || !s.timerEnd) return null;
-    return s.timerEnd - serverNow();
+    if(!s || s.phase !== 'drawing') return null;
+    if(s.timerEnd) return s.timerEnd - serverNow();
+    if(typeof s.timerPausedAt === 'number') return s.timerPausedAt;   /* frozen */
+    return null;
+  }
+  function timerIsPaused(){
+    const s = latestState;
+    return !!(s && s.phase === 'drawing' && !s.timerEnd && typeof s.timerPausedAt === 'number');
   }
 
   function paintTimers(){
     const remaining = timerRemaining();
-    const low = remaining != null && remaining < 15000;
+    const paused = timerIsPaused();
+    const low = remaining != null && !paused && remaining < 15000;
+    const face = remaining == null ? '' : (paused ? '⏸ ' : '') + fmtTime(remaining);
 
     const pill = document.getElementById('drawTimerPill');
     if(pill){
       pill.style.display = remaining == null ? 'none' : 'inline-block';
       if(remaining != null){
-        pill.textContent = '⏱ ' + fmtTime(remaining);
+        pill.textContent = paused ? face : '⏱ ' + fmtTime(remaining);
         pill.classList.toggle('low', low);
       }
     }
     const host = document.getElementById('hostTimer');
     if(host){
-      host.textContent = remaining == null ? '' : fmtTime(remaining);
+      host.textContent = face;
       host.style.color = low ? 'var(--danger)' : '';
+      host.style.opacity = paused ? '.6' : '';
     }
     const screen = document.getElementById('screenTimer');
     if(screen){
       screen.style.display = remaining == null ? 'none' : '';
       if(remaining != null){
-        screen.textContent = fmtTime(remaining);
+        screen.textContent = face;
         screen.classList.toggle('low', low);
       }
+    }
+    const pauseBtn = document.getElementById('pauseTimerBtn');
+    if(pauseBtn){
+      const has = remaining != null;
+      pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+      pauseBtn.disabled = !has;
+      const clearBtn = document.getElementById('clearTimerBtn');
+      if(clearBtn) clearBtn.disabled = !has;
+      const startBtn = document.getElementById('startTimerBtn');
+      if(startBtn) startBtn.textContent = has ? 'Restart timer' : 'Start timer';
     }
   }
   /* Four ticks a second, so the displayed second turns over on time. */
@@ -1494,9 +1532,12 @@
           <div class="timer-pill" id="drawTimerPill" style="display:none;"></div>
         </div>
         <div class="canvas-area" id="canvasArea">
-          <div class="canvas-stage" id="canvasStage">
-            <canvas id="canvas"></canvas>
-            <canvas id="overlay"></canvas>
+          <div class="canvas-viewport" id="canvasViewport">
+            <div class="canvas-stage" id="canvasStage">
+              <canvas id="canvas"></canvas>
+              <canvas id="overlay"></canvas>
+            </div>
+            <div class="zoom-pill" id="zoomPill">100%</div>
           </div>
         </div>
         <div class="db-toolbar">
@@ -1517,6 +1558,7 @@
     updateDrawTimer(state);
 
     const area = document.getElementById('canvasArea');
+    const viewport = document.getElementById('canvasViewport');
     const stage = document.getElementById('canvasStage');
     const canvas = document.getElementById('canvas');
     const overlay = document.getElementById('overlay');
@@ -1529,14 +1571,65 @@
     ctx.fillRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
+    /* ---- zoom & pan ----
+       The bitmap never changes; only how much of it you are looking at. Because
+       pointer positions are mapped through getBoundingClientRect, which already
+       accounts for the CSS transform, drawing stays pixel-accurate at any zoom. */
+    const MIN_ZOOM = 1, MAX_ZOOM = 8;
+    let zoom = 1, panX = 0, panY = 0, viewSize = 280;
+    let zoomPillTimer = null;
+
+    function clampPan(){
+      const min = viewSize * (1 - zoom);
+      panX = Math.min(0, Math.max(min, panX));
+      panY = Math.min(0, Math.max(min, panY));
+    }
+    function applyView(){
+      stage.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+      const pill = document.getElementById('zoomPill');
+      if(pill){
+        pill.textContent = Math.round(zoom * 100) + '%';
+        pill.classList.toggle('show', zoom > 1.01);
+      }
+      const out = document.getElementById('zoomOutBtn');
+      const inn = document.getElementById('zoomInBtn');
+      if(out) out.classList.toggle('disabled', zoom <= MIN_ZOOM + 0.001);
+      if(inn) inn.classList.toggle('disabled', zoom >= MAX_ZOOM - 0.001);
+    }
+    /* Keep the point under the fingers (or cursor) pinned while scaling. */
+    function zoomAt(nextZoom, fx, fy){
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
+      if(Math.abs(z - zoom) < 0.0005) return;
+      panX = fx - (fx - panX) * (z / zoom);
+      panY = fy - (fy - panY) * (z / zoom);
+      zoom = z;
+      clampPan();
+      applyView();
+    }
+    function resetView(){ zoom = 1; panX = 0; panY = 0; applyView(); }
+    function viewportPoint(e){
+      const r = viewport.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+
+    viewport.addEventListener('wheel', (e)=>{
+      e.preventDefault();
+      const p = viewportPoint(e);
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      zoomAt(zoom * factor, p.x, p.y);
+    }, { passive:false });
+
     /* Only the CSS box changes when the viewport moves — pixels are never rescaled. */
     function layoutStage(){
       const cs = getComputedStyle(area);
       const availW = area.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const availH = area.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
       const size = Math.max(80, Math.floor(Math.min(availW, availH)));
-      stage.style.width = size + 'px';
-      stage.style.height = size + 'px';
+      viewport.style.width = size + 'px';
+      viewport.style.height = size + 'px';
+      viewSize = size;
+      clampPan();
+      applyView();
     }
     layoutStage();
     window.addEventListener('resize', layoutStage);
@@ -1613,6 +1706,7 @@
     const modes = [
       {id:'pen', label:'✏️ Pen'},
       {id:'eraser', label:'🧽 Eraser'},
+      {id:'grab', label:'✋ Move'},
       {id:'line', label:'／ Line'},
       {id:'rect', label:'▭ Rect'},
       {id:'circle', label:'◯ Circle'},
@@ -1647,6 +1741,7 @@
       /* Fill only applies to closed shapes. */
       const fillable = ['rect','circle','triangle','star'].includes(id);
       fillBtn.classList.toggle('disabled', !fillable);
+      viewport.style.cursor = id === 'grab' ? 'grab' : 'crosshair';
     }
     setMode('pen');
 
@@ -1666,6 +1761,24 @@
       modeRow.appendChild(b);
     });
 
+    modeRow.appendChild(Object.assign(document.createElement('div'), {className:'divider'}));
+    [
+      { id:'zoomOutBtn', label:'−', title:'Zoom out', act:()=> zoomAt(zoom / 1.4, viewSize/2, viewSize/2) },
+      { id:'zoomFitBtn', label:'⤢', title:'Fit the whole canvas', act:()=> resetView() },
+      { id:'zoomInBtn',  label:'+', title:'Zoom in', act:()=> zoomAt(zoom * 1.4, viewSize/2, viewSize/2) }
+    ].forEach(z=>{
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tool-btn zoom-btn';
+      btn.id = z.id;
+      btn.textContent = z.label;
+      btn.title = z.title;
+      btn.setAttribute('aria-label', z.title);
+      btn.addEventListener('click', z.act);
+      modeRow.appendChild(btn);
+    });
+    applyView();
+
     paintRecent();
 
     /* Canvas pixels are 1200×1200 regardless of how big the stage is on screen. */
@@ -1675,25 +1788,81 @@
     let hasDrawn = false;
     let drawing = false, activePointer = null, startX = 0, startY = 0, lastX = 0, lastY = 0;
 
+    /* Two fingers always pan and zoom, whichever tool is selected — the grab
+       tool is there for a mouse, and for one-finger panning. */
+    const pointers = new Map();
+    let gesture = null;
+
     function pos(e){
       const rect = overlay.getBoundingClientRect();
       const sx = CANVAS_SIZE / rect.width;
       const sy = CANVAS_SIZE / rect.height;
       return { x:(e.clientX - rect.left) * sx, y:(e.clientY - rect.top) * sy };
     }
+    function cancelStroke(){
+      if(!drawing) return;
+      octx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
+      drawing = false; activePointer = null;
+    }
+    function pointerList(){ return [...pointers.values()]; }
+    function gestureFrom(a, b){
+      const r = viewport.getBoundingClientRect();
+      const mx = (a.x + b.x) / 2 - r.left;
+      const my = (a.y + b.y) / 2 - r.top;
+      return { dist: Math.hypot(a.x - b.x, a.y - b.y), mx, my, zoom, panX, panY };
+    }
+
     function start(e){
-      if(drawing) return;                 /* ignore extra fingers / palm touches */
+      pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+      if(viewport.setPointerCapture){ try{ viewport.setPointerCapture(e.pointerId); }catch(err){} }
+
+      if(pointers.size === 2){
+        cancelStroke();
+        const [a, b] = pointerList();
+        gesture = gestureFrom(a, b);
+        return;
+      }
+      if(pointers.size > 2) return;
+
       e.preventDefault();
+      if(currentMode === 'grab'){
+        gesture = { pan:true, x:e.clientX, y:e.clientY, panX, panY };
+        return;
+      }
+      if(drawing) return;
       drawing = true; activePointer = e.pointerId; hasDrawn = true;
       const p = pos(e); startX = p.x; startY = p.y; lastX = p.x; lastY = p.y;
-      if(overlay.setPointerCapture){ try{ overlay.setPointerCapture(e.pointerId); }catch(err){} }
       if(currentMode === 'pen' || currentMode === 'eraser'){
         /* A tap with no movement should still leave a dot. */
         ctx.strokeStyle = strokeColor(); ctx.lineWidth = strokeWidth();
         ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + 0.01, p.y); ctx.stroke();
       }
     }
+
     function move(e){
+      if(pointers.has(e.pointerId)) pointers.set(e.pointerId, { x:e.clientX, y:e.clientY });
+
+      if(gesture && gesture.pan && pointers.size === 1){
+        e.preventDefault();
+        panX = gesture.panX + (e.clientX - gesture.x);
+        panY = gesture.panY + (e.clientY - gesture.y);
+        clampPan(); applyView();
+        return;
+      }
+      if(gesture && pointers.size >= 2){
+        e.preventDefault();
+        const [a, b] = pointerList();
+        const now = gestureFrom(a, b);
+        if(gesture.dist > 0){
+          /* Scale about the midpoint, and follow the midpoint as it moves. */
+          zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, gesture.zoom * (now.dist / gesture.dist)));
+          panX = now.mx - (gesture.mx - gesture.panX) * (zoom / gesture.zoom);
+          panY = now.my - (gesture.my - gesture.panY) * (zoom / gesture.zoom);
+          clampPan(); applyView();
+        }
+        return;
+      }
+
       if(!drawing || e.pointerId !== activePointer) return;
       e.preventDefault();
       const p = pos(e);
@@ -1706,20 +1875,24 @@
         drawShape(octx, currentMode, startX, startY, p.x, p.y, currentColor, currentSize, fillMode);
       }
     }
+
     function end(e){
+      pointers.delete(e.pointerId);
+      if(pointers.size < 2) gesture = pointers.size === 1 && gesture && gesture.pan ? gesture : null;
       if(!drawing || (e.pointerId != null && e.pointerId !== activePointer)) return;
-      if(currentMode !== 'pen' && currentMode !== 'eraser'){
+      if(currentMode !== 'pen' && currentMode !== 'eraser' && currentMode !== 'grab'){
         const p = pos(e);
         drawShape(ctx, currentMode, startX, startY, p.x, p.y, currentColor, currentSize, fillMode);
         octx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
       }
       drawing = false; activePointer = null;
     }
-    overlay.addEventListener('pointerdown', start);
-    overlay.addEventListener('pointermove', move);
-    overlay.addEventListener('pointerup', end);
-    overlay.addEventListener('pointercancel', end);
-    overlay.addEventListener('contextmenu', e=>e.preventDefault());
+
+    viewport.addEventListener('pointerdown', start);
+    viewport.addEventListener('pointermove', move);
+    viewport.addEventListener('pointerup', end);
+    viewport.addEventListener('pointercancel', end);
+    viewport.addEventListener('contextmenu', e=>e.preventDefault());
 
     document.getElementById('clearBtn').addEventListener('click', ()=>{
       if(hasDrawn && !confirm('Clear the whole drawing?')) return;
@@ -1948,7 +2121,9 @@
               <span class="lbl">Timer</span>
               <input id="minutesInput" type="number" min="1" max="60" value="3" aria-label="Timer minutes">
               <span class="lbl">min</span>
-              <button class="btn small" id="startTimerBtn">Start drawing timer</button>
+              <button class="btn small" id="startTimerBtn">Start timer</button>
+              <button class="btn secondary small" id="pauseTimerBtn" disabled>Pause</button>
+              <button class="btn ghost small" id="clearTimerBtn" disabled>Clear</button>
             </div>
             <div class="phase-row">
               <div>
@@ -2059,12 +2234,37 @@
       const state = await getState();
       state.phase = 'drawing';
       state.timerEnd = serverNow() + mins*60000;
+      state.timerPausedAt = null;
+      await setState(state);
+      noteState(state);
+    });
+
+    document.getElementById('pauseTimerBtn').addEventListener('click', async ()=>{
+      const state = await getState();
+      if(state.timerEnd){
+        /* Freeze what is left; the deadline is rebuilt from it on resume. */
+        state.timerPausedAt = Math.max(0, state.timerEnd - serverNow());
+        state.timerEnd = null;
+      } else if(typeof state.timerPausedAt === 'number'){
+        state.timerEnd = serverNow() + state.timerPausedAt;
+        state.timerPausedAt = null;
+      } else {
+        return;
+      }
+      await setState(state);
+      noteState(state);
+    });
+
+    document.getElementById('clearTimerBtn').addEventListener('click', async ()=>{
+      const state = await getState();
+      state.timerEnd = null;
+      state.timerPausedAt = null;
       await setState(state);
       noteState(state);
     });
     document.getElementById('votingBtn').addEventListener('click', async ()=>{
       const state = await getState();
-      state.phase = 'voting'; state.timerEnd = null;
+      state.phase = 'voting'; state.timerEnd = null; state.timerPausedAt = null;
       await setState(state);
       noteState(state);
     });
@@ -2429,21 +2629,39 @@
     applyHiddenState();
   }
 
-  /* Guests who typed the address instead of scanning: let them in with the
-     code from the screen. */
-  function renderJoinScreen(){
+  /* Someone who just opens the address has no idea what to do next: they might
+     be a player looking for a board, or a presenter about to run one. Ask. */
+  function renderLanding(){
+    const canHost = !!dbUrl;
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card join-card">
-          <h2>Join a drawing board</h2>
-          <p class="sub">Enter the code shown on the presenter's screen, or scan their QR code.</p>
-          <input id="joinCode" class="field join-input" type="text" inputmode="latin"
-                 autocapitalize="characters" autocomplete="off" spellcheck="false"
-                 maxlength="${CODE_LENGTH}" placeholder="${'ABC123'}" aria-label="Board code">
-          <div class="err" id="joinErr"></div>
-          <div style="margin-top:16px;"><button class="btn" id="joinBtn">Join</button></div>
+          <div class="landing-mark">🎨</div>
+          <h2>Draw the Topic</h2>
+          <p class="sub">Everyone draws the same topic on their phone, then the room votes for a favourite.</p>
+
+          <div class="landing-block">
+            <div class="landing-label">Joining a game?</div>
+            <p class="landing-hint">Type the 6-character code from the presenter's screen.</p>
+            <input id="joinCode" class="field join-input" type="text" inputmode="latin"
+                   autocapitalize="characters" autocomplete="off" spellcheck="false"
+                   maxlength="${CODE_LENGTH}" placeholder="ABC123" aria-label="Board code">
+            <div class="err" id="joinErr"></div>
+            <button class="btn landing-go" id="joinBtn">Join the game</button>
+          </div>
+
+          <div class="landing-split"><span>or</span></div>
+
+          <div class="landing-block">
+            <div class="landing-label">Running the game?</div>
+            <p class="landing-hint">${canHost
+              ? 'Sign in to put a board on the big screen and get a code for the room.'
+              : 'This copy has no board database set up yet. Open the host page to connect one.'}</p>
+            <button class="btn secondary landing-go" id="hostGoBtn">${canHost ? 'Sign in as host' : 'Set up hosting'}</button>
+          </div>
         </div>
       </div>`;
+
     const input = document.getElementById('joinCode');
     const err = document.getElementById('joinErr');
     input.addEventListener('input', ()=>{
@@ -2459,20 +2677,30 @@
     }
     document.getElementById('joinBtn').addEventListener('click', join);
     input.addEventListener('keydown', e=>{ if(e.key === 'Enter') join(); });
+    document.getElementById('hostGoBtn').addEventListener('click', ()=>{
+      const url = new URL(window.location.href);
+      url.searchParams.set('host', '1');
+      window.location.href = url.toString();
+    });
     input.focus();
   }
 
   /* ================= ROUTER ================= */
-  if(!dbUrl){
-    if(isHost){ renderSetup(); }
-    else { app.innerHTML = '<div class="setup-wrap"><div class="setup-card"><h2>Ask your host for the QR code</h2><p class="sub">This link is missing its board address.</p></div></div>'; }
+  if(isHost && !dbUrl){
+    renderSetup();
+  } else if(isHost){
+    /* Hosts go to sign-in and their board picker, board or not. */
+    startHost();
   } else if(params.get('screen') === '1' && boardId){
     renderScreenView();
-  } else if(isHost){
-    startHost();
-  } else if(!boardId && BUILT_IN.dbUrl){
-    /* Shared deployment: no board in the link means they need a code. */
-    renderJoinScreen();
+  } else if(!boardId && params.get('db')){
+    /* A link that names its own database and no board is a pre-boards link;
+       it still means "the one shared board". */
+    renderDrawShell();
+    drawPollLoop();
+  } else if(!boardId){
+    /* Bare address — ask whether they are playing or hosting. */
+    renderLanding();
   } else {
     renderDrawShell();
     drawPollLoop();
