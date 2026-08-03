@@ -231,6 +231,14 @@
   }
 
   .landing-mark{font-size:40px;line-height:1;margin-bottom:6px;}
+  .join-card{position:relative;}
+  .landing-signin{position:absolute;top:14px;right:14px;font-size:13px;padding:7px 12px;}
+  .landing-welcome{
+    text-align:left;background:var(--accent-soft);border:1px solid var(--line);
+    border-radius:14px;padding:14px 16px;margin:20px 0 4px;
+  }
+  .landing-welcome .landing-hint{margin-bottom:0;overflow:hidden;text-overflow:ellipsis;}
+  .landing-welcome .landing-go{margin-top:10px;}
   .landing-help{width:100%;margin-top:20px;font-size:13.5px;}
   .picker-note{font-size:12.5px;color:var(--ink-soft);margin:14px 0 0;line-height:1.5;}
   .board-item-code{
@@ -3126,12 +3134,23 @@
      be a player looking for a board, or a presenter about to run one. Ask. */
   function renderLanding(){
     const canHost = !!dbUrl;
+    /* A host who has been here before should not have to read a pitch about
+       hosting to find the way back in. */
+    const returning = !!(AUTH_ENABLED && canHost && auth.refreshToken && !auth.isAnon);
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card join-card">
+          ${canHost ? '<button class="btn ghost landing-signin" id="topSignInBtn">Sign in</button>' : ''}
           <div class="landing-mark">🎨</div>
           <h2>Draw the Topic</h2>
           <p class="sub">Everyone draws the same topic on their phone, then the room votes for a favourite.</p>
+
+          ${returning ? `
+          <div class="landing-welcome">
+            <div class="landing-label">Welcome back</div>
+            <p class="landing-hint">${esc(auth.email || 'You are signed in')}</p>
+            <button class="btn landing-go" id="continueBtn">Go to my boards</button>
+          </div>` : ''}
 
           <div class="landing-block">
             <div class="landing-label">Joining a game?</div>
@@ -3150,7 +3169,7 @@
             <p class="landing-hint">${canHost
               ? 'Sign in with an email and password — free, takes a minute — then create a board and share its code with the room.'
               : 'This copy has no board database set up yet. Open the host page to connect one.'}</p>
-            <button class="btn secondary landing-go" id="hostGoBtn">${canHost ? 'Sign in as host' : 'Set up hosting'}</button>
+            <button class="btn secondary landing-go" id="hostGoBtn">${canHost ? (returning ? 'Sign in as someone else' : 'Sign in or create an account') : 'Set up hosting'}</button>
           </div>
 
           <button class="btn ghost landing-help" id="landingHelpBtn">New here? How this works</button>
@@ -3173,12 +3192,18 @@
     document.getElementById('joinBtn').addEventListener('click', join);
     input.addEventListener('keydown', e=>{ if(e.key === 'Enter') join(); });
     document.getElementById('landingHelpBtn').addEventListener('click', openHelp);
-    document.getElementById('hostGoBtn').addEventListener('click', ()=>{
+    function goHost(){
       const url = new URL(window.location.href);
       url.searchParams.set('host', '1');
       window.location.href = url.toString();
-    });
-    input.focus();
+    }
+    document.getElementById('hostGoBtn').addEventListener('click', goHost);
+    const topSignIn = document.getElementById('topSignInBtn');
+    if(topSignIn) topSignIn.addEventListener('click', goHost);
+    const continueBtn = document.getElementById('continueBtn');
+    if(continueBtn) continueBtn.addEventListener('click', goHost);
+    /* Do not pop a keyboard at a returning host who is here to press one button. */
+    if(!returning) input.focus();
   }
 
   /* ================= ROUTER ================= */

@@ -14,10 +14,11 @@ this. If you want to set up your own copy instead, see
 
 ---
 
-> **Lost your board?** Go to the address, choose **Running the game? → Sign in
-> as host**, and every board you have made is listed there — from any laptop.
-> There is also a **Help** button on the landing page, the board list and the
-> board itself.
+> **Coming back?** Open the address and press **Sign in**, top right. If you
+> have signed in on that browser before, there is a **Go to my boards** button
+> waiting instead — no password to retype. Your boards live with your account,
+> so they are there from any laptop. There is also a **Help** button on the
+> landing page, the board list and the board itself.
 
 ## Before the night
 
