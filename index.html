@@ -2,121 +2,387 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1729">
 <title>Draw the Topic</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"></noscript>
+<!-- deferred: venue wifi should never be able to stop the board from rendering -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
   :root{
-    --cork:#b98a54; --cork-dark:#8f6438; --cork-shadow:#5c3e1f;
-    --paper:#fffdf6; --ink:#2b2118; --ink-soft:#6b5c4a;
-    --pin-red:#c1443c; --pin-green:#3e7c59; --pin-blue:#3b5a8a; --gold:#d3a123;
-    --accent:#3e7c59; --accent-dark:#2e5d43;
+    --bg:#f4f5fa;
+    --surface:#ffffff;
+    --surface-2:#eef0f7;
+    --ink:#0f1729;
+    --ink-soft:#606b85;
+    --line:#e3e6f0;
+    --accent:#5b5bd6;
+    --accent-hi:#7c6cf0;
+    --accent-soft:#eceafc;
+    --danger:#e5484d;
+    --warn:#f5a524;
+    --ok:#2f9e68;
+    --radius:14px;
+    --radius-lg:20px;
+    --shadow-sm:0 1px 2px rgba(15,23,41,.05), 0 1px 3px rgba(15,23,41,.07);
+    --shadow-md:0 6px 20px rgba(15,23,41,.09);
+    --shadow-lg:0 20px 50px rgba(8,12,25,.28);
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:#f4ece0;font-family:'Inter',sans-serif;color:var(--ink);height:100%;}
-  h1,h2,.hand{font-family:'Kalam',cursive;}
-  button{font-family:'Inter',sans-serif;cursor:pointer;border:none;}
-  .btn{padding:12px 22px;border-radius:10px;font-weight:600;font-size:15px;background:var(--accent);color:#fff;transition:transform .12s ease, background .12s ease;}
-  .btn:hover{background:var(--accent-dark);transform:translateY(-1px);}
-  .btn:active{transform:translateY(0);}
-  .btn.secondary{background:transparent;color:var(--ink-soft);border:1.5px solid #d8cdb8;}
-  .btn.secondary:hover{background:#f1e9d8;color:var(--ink);}
-  .btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
-  .btn.small{padding:8px 14px;font-size:13px;}
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1421; --surface:#171d2c; --surface-2:#111726;
+      --ink:#eef1f8; --ink-soft:#98a2ba; --line:#262d40;
+      --accent:#7c6cf0; --accent-hi:#9a8dff; --accent-soft:#232041;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+      --shadow-md:0 6px 20px rgba(0,0,0,.45);
+    }
+  }
 
-  .setup-wrap{max-width:520px;margin:0 auto;padding:40px 20px;}
-  .setup-card{background:var(--paper);border-radius:14px;padding:26px;box-shadow:0 6px 0 rgba(0,0,0,0.08);}
-  .setup-card h2{margin-top:0;}
-  .setup-card ol{padding-left:20px;line-height:1.7;font-size:14px;}
-  .setup-card a{color:var(--accent-dark);}
-  .setup-card input{width:100%;padding:12px 14px;border-radius:10px;border:1.5px solid #d8cdb8;font-size:15px;margin-top:6px;}
-  .setup-card .err{color:var(--pin-red);font-size:13px;margin-top:8px;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0;padding:0;height:100%;
+    background:var(--bg);color:var(--ink);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    font-size:15px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  h1,h2,h3,.display{font-family:'Space Grotesk','Inter',sans-serif;letter-spacing:-.02em;font-weight:600;}
+  button,input{font-family:inherit;}
+  button{cursor:pointer;border:none;}
+  :focus-visible{outline:2px solid var(--accent-hi);outline-offset:2px;}
 
-  .draw-wrap{max-width:480px;margin:0 auto;padding:20px 16px 32px;}
-  .topic-card{background:var(--paper);border-radius:14px;padding:18px 20px;text-align:center;box-shadow:0 6px 0 rgba(0,0,0,0.08);margin-bottom:16px;position:relative;}
-  .topic-card .eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
-  .topic-card h1{font-size:26px;margin:4px 0 0;line-height:1.15;color:var(--ink);}
-  .timer-pill{display:inline-block;margin-top:10px;padding:6px 14px;border-radius:999px;background:#f1e9d8;font-weight:700;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums;}
-  .timer-pill.low{background:#f6d9d6;color:var(--pin-red);}
-  .name-row{margin-top:14px;}
-  .name-row input{width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid #d8cdb8;font-family:'Inter',sans-serif;font-size:14px;background:var(--paper);}
-  .actions{display:flex;gap:10px;margin-top:14px;}
-  .actions .btn{flex:1;}
-  .confirm{text-align:center;padding:40px 20px;}
-  .confirm .stamp{font-size:52px;}
-  .confirm h2{font-size:26px;margin:10px 0 4px;}
-  .confirm p{color:var(--ink-soft);font-size:14px;}
+  .btn{
+    padding:11px 20px;border-radius:12px;font-weight:600;font-size:14px;
+    background:var(--accent);color:#fff;
+    box-shadow:0 1px 2px rgba(15,23,41,.12);
+    transition:background .15s ease, transform .1s ease, opacity .15s ease;
+  }
+  .btn:hover{background:var(--accent-hi);}
+  .btn:active{transform:scale(.98);}
+  .btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+  .btn.secondary{background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:var(--shadow-sm);}
+  .btn.secondary:hover{background:var(--surface-2);}
+  .btn.ghost{background:transparent;color:var(--ink-soft);border:1px solid transparent;box-shadow:none;}
+  .btn.ghost:hover{background:var(--surface-2);color:var(--ink);}
+  .btn.danger{background:transparent;color:var(--danger);border:1px solid rgba(229,72,77,.35);box-shadow:none;}
+  .btn.danger:hover{background:rgba(229,72,77,.1);}
+  .btn.small{padding:8px 14px;font-size:13px;border-radius:10px;}
+  .eyebrow{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);font-weight:600;}
 
-  /* ---- clean full-height drawing screen ---- */
-  .draw-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:#fff;}
-  .db-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:var(--paper);border-bottom:1px solid #ece1cd;flex:0 0 auto;}
-  .db-top .topic-text{font-family:'Kalam',cursive;font-size:19px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .db-top .eyebrow{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);font-weight:700;display:block;}
-  .canvas-area{flex:1 1 auto;position:relative;min-height:0;background:#fafafa;}
-  .canvas-area canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;}
-  #canvas{background:#fff;}
-  .db-toolbar{flex:0 0 auto;background:var(--paper);border-top:1px solid #ece1cd;padding:8px 10px;}
-  .tool-row{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:4px 2px;}
-  .tool-row + .tool-row{margin-top:2px;}
-  .swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;cursor:pointer;flex:0 0 auto;}
-  .swatch.active{border-color:var(--ink);transform:scale(1.12);}
-  .color-picker-wrap{position:relative;width:26px;height:26px;flex:0 0 auto;border-radius:50%;overflow:hidden;border:2px dashed #c9bda4;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);}
-  .color-picker-wrap input{position:absolute;inset:-4px;width:34px;height:34px;border:none;padding:0;cursor:pointer;opacity:0;}
-  .mode-btn{flex:0 0 auto;padding:7px 11px;border-radius:8px;background:#f1e9d8;font-size:12px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
-  .mode-btn.active{background:var(--accent);color:#fff;}
-  .size-btn{width:30px;height:30px;border-radius:8px;background:#f1e9d8;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .field{
+    width:100%;padding:12px 14px;border-radius:12px;
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    font-size:15px;transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .field:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);outline:none;}
+  .field::placeholder{color:var(--ink-soft);opacity:.8;}
+
+  /* ---------- setup ---------- */
+  .setup-wrap{max-width:560px;margin:0 auto;padding:48px 20px;}
+  .setup-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:28px;box-shadow:var(--shadow-md);}
+  .setup-card h2{margin:0 0 6px;font-size:24px;}
+  .setup-card .sub{color:var(--ink-soft);font-size:14px;margin:0 0 18px;}
+  .setup-card ol{padding-left:18px;line-height:1.8;font-size:14px;color:var(--ink-soft);margin:0 0 20px;}
+  .setup-card ol strong{color:var(--ink);}
+  .setup-card a{color:var(--accent);}
+  .setup-card code{background:var(--surface-2);padding:1px 6px;border-radius:5px;font-size:12.5px;}
+  .err{color:var(--danger);font-size:13px;margin-top:10px;}
+
+  /* ---------- participant shells ---------- */
+  .draw-wrap{max-width:560px;margin:0 auto;padding:24px 16px 40px;}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm);text-align:center;margin-bottom:18px;}
+  .panel h1{font-size:24px;margin:6px 0 0;}
+  .confirm{text-align:center;padding:56px 20px;}
+  .confirm .stamp{
+    width:64px;height:64px;margin:0 auto 16px;border-radius:20px;
+    display:flex;align-items:center;justify-content:center;font-size:30px;
+    background:linear-gradient(140deg,var(--accent),var(--accent-hi));
+    box-shadow:0 10px 24px rgba(91,91,214,.35);
+  }
+  .confirm h2{font-size:24px;margin:0 0 6px;}
+  .confirm p{color:var(--ink-soft);font-size:14px;margin:0;}
+
+  /* ---------- drawing screen ---------- */
+  .draw-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);}
+  .db-top{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:12px 16px calc(12px);background:var(--surface);
+    border-bottom:1px solid var(--line);flex:0 0 auto;
+    padding-top:calc(12px + env(safe-area-inset-top));
+  }
+  .db-top .topic-text{font-family:'Space Grotesk','Inter',sans-serif;font-weight:600;font-size:18px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+  .timer-pill{
+    display:inline-block;padding:7px 13px;border-radius:999px;background:var(--surface-2);
+    font-weight:600;font-size:13px;font-variant-numeric:tabular-nums;flex:0 0 auto;
+    border:1px solid var(--line);
+  }
+  .timer-pill.low{background:rgba(229,72,77,.12);color:var(--danger);border-color:rgba(229,72,77,.3);}
+
+  .canvas-area{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px;background:var(--surface-2);}
+  .canvas-stage{
+    position:relative;flex:0 0 auto;width:280px;height:280px;
+    border-radius:16px;overflow:hidden;background:#fff;
+    box-shadow:var(--shadow-md);border:1px solid var(--line);
+  }
+  .canvas-stage canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block;}
+
+  .db-toolbar{flex:0 0 auto;background:var(--surface);border-top:1px solid var(--line);padding:10px 10px 4px;}
+  .tool-row{display:flex;align-items:center;gap:8px;overflow-x:auto;padding:2px;scrollbar-width:none;}
+  .tool-row::-webkit-scrollbar{display:none;}
+  .tool-row + .tool-row{margin-top:8px;}
+  .swatch{
+    width:28px;height:28px;border-radius:50%;flex:0 0 auto;cursor:pointer;
+    border:2px solid transparent;box-shadow:inset 0 0 0 1px rgba(15,23,41,.12);
+    transition:transform .12s ease;
+  }
+  .swatch.active{border-color:var(--accent);transform:scale(1.15);box-shadow:inset 0 0 0 1px rgba(15,23,41,.12), 0 0 0 3px var(--accent-soft);}
+  .color-picker-wrap{
+    position:relative;width:28px;height:28px;flex:0 0 auto;border-radius:50%;overflow:hidden;
+    border:2px solid var(--line);background:conic-gradient(#e5484d,#f5a524,#2f9e68,#3ba3a3,#5b5bd6,#c15a9e,#e5484d);
+  }
+  .color-picker-wrap input{position:absolute;inset:-6px;width:40px;height:40px;border:none;padding:0;cursor:pointer;opacity:0;}
+  .tool-btn{
+    flex:0 0 auto;padding:8px 12px;border-radius:10px;background:var(--surface-2);
+    font-size:12.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;
+    border:1px solid transparent;transition:background .12s ease,color .12s ease;
+  }
+  .tool-btn:hover{color:var(--ink);}
+  .tool-btn.active{background:var(--accent);color:#fff;}
+  .tool-btn.disabled{opacity:.4;pointer-events:none;}
+  .size-btn{width:32px;height:32px;border-radius:10px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .size-btn span{border-radius:50%;background:var(--ink-soft);display:block;}
   .size-btn.active{background:var(--accent);}
-  .size-btn span{border-radius:50%;background:var(--ink);display:block;}
   .size-btn.active span{background:#fff;}
-  .divider{width:1px;align-self:stretch;background:#e3d9c4;flex:0 0 auto;margin:0 2px;}
-  .db-bottom{display:flex;gap:8px;padding:8px 10px 10px;}
-  .db-bottom input{flex:1;padding:10px 12px;border-radius:10px;border:1.5px solid #d8cdb8;font-size:13px;min-width:0;}
-  .db-bottom .btn{padding:10px 16px;font-size:13px;white-space:nowrap;}
+  .divider{width:1px;align-self:stretch;background:var(--line);flex:0 0 auto;margin:2px 4px;}
+  .tool-label{
+    font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:700;flex:0 0 auto;
+  }
+  .recent-swatches{display:flex;gap:8px;align-items:center;}
 
-  .vote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;margin-top:16px;}
-  .vote-card{background:var(--paper);border-radius:10px;padding:8px 8px 10px;box-shadow:0 4px 0 rgba(0,0,0,0.08);text-align:center;position:relative;}
-  .vote-card img{width:100%;border-radius:6px;display:block;background:#fff;}
-  .vote-card .who{font-family:'Kalam',cursive;font-size:13px;color:var(--ink-soft);margin-top:6px;}
-  .vote-card .vote-btn{margin-top:8px;width:100%;padding:8px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:13px;}
-  .vote-card .vote-btn:disabled{background:#e3d9c4;color:var(--ink-soft);}
-  .vote-card.chosen{outline:3px solid var(--accent);}
-  .vote-count{font-size:12px;color:var(--ink-soft);margin-top:4px;font-weight:600;}
-  .crown{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:22px;}
+  .db-bottom{
+    display:flex;gap:8px;padding:10px;background:var(--surface);
+    border-top:1px solid var(--line);
+    padding-bottom:calc(10px + env(safe-area-inset-bottom));
+  }
+  .db-bottom .field{flex:1;min-width:0;padding:11px 13px;font-size:14px;border-radius:12px;}
+  .db-bottom .btn{padding:11px 18px;font-size:14px;white-space:nowrap;}
 
-  .host-wrap{padding:24px;min-height:100vh;background:radial-gradient(circle at 20% 10%, var(--cork) 0%, var(--cork-dark) 70%);}
-  .host-top{display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap;margin-bottom:18px;}
-  .qr-box{background:var(--paper);border-radius:14px;padding:18px;text-align:center;box-shadow:0 8px 0 var(--cork-shadow);flex:0 0 auto;}
-  .qr-box .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:700;margin-bottom:8px;}
-  #qrcode{display:flex;justify-content:center;margin:6px 0;}
-  .qr-box .hint{font-size:12px;color:var(--ink-soft);margin-top:6px;max-width:170px;}
-  .control-panel{background:var(--paper);border-radius:14px;padding:18px 20px;box-shadow:0 8px 0 var(--cork-shadow);flex:1 1 320px;}
-  .control-panel label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-soft);font-weight:700;}
-  .control-panel input[type=text]{width:100%;margin-top:6px;padding:12px 14px;border-radius:10px;border:1.5px solid #d8cdb8;font-size:17px;font-family:'Kalam',cursive;background:#fffef9;}
-  .control-panel input[type=number]{width:70px;padding:8px 10px;border-radius:8px;border:1.5px solid #d8cdb8;font-size:14px;}
-  .control-row{display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap;}
-  .phase-row{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:14px;border-top:1px solid #eee0c8;flex-wrap:wrap;gap:10px;}
-  .phase-badge{display:inline-block;padding:5px 12px;border-radius:999px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;}
-  .phase-badge.drawing{background:#dcefe2;color:var(--accent-dark);}
-  .phase-badge.voting{background:#fde9c9;color:#8a5c0f;}
-  .phase-badge.results{background:#e6dcf6;color:#5b3e8a;}
-  .host-timer{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;}
-  .board-header{display:flex;justify-content:space-between;align-items:center;color:#fff8ec;margin:18px 0 12px;}
-  .board-header h1{font-size:24px;margin:0;text-shadow:0 2px 0 rgba(0,0,0,.2);}
-  .board-header .count{font-size:13px;opacity:.85;font-family:'Inter',sans-serif;}
-  #board{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:22px 26px;padding:8px 4px 20px;}
-  .pin-card{background:var(--paper);border-radius:4px;padding:10px 10px 34px;box-shadow:0 10px 18px rgba(0,0,0,0.28);position:relative;}
-  .pin-card.winner{outline:3px solid var(--gold);}
-  .pin-card img{width:100%;display:block;border-radius:2px;background:#fff;}
-  .pin-card .pin-dot{position:absolute;top:-9px;left:50%;transform:translateX(-50%);width:16px;height:16px;border-radius:50%;box-shadow:0 3px 4px rgba(0,0,0,.35);}
-  .pin-card .who{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-family:'Kalam',cursive;font-size:14px;color:var(--ink-soft);}
-  .pin-card .votes-badge{position:absolute;bottom:8px;right:10px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
-  .empty-state{color:#fff8ec;text-align:center;padding:60px 20px;opacity:.85;}
-  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2b2118;color:#fff;padding:10px 18px;border-radius:10px;font-size:13px;z-index:999;max-width:90%;text-align:center;}
-  @media (max-width:600px){ .host-wrap{padding:14px;} .host-top{flex-direction:column;} }
+  /* ---------- voting / results ---------- */
+  .vote-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:16px;}
+  .vote-card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:10px;box-shadow:var(--shadow-sm);text-align:center;position:relative;}
+  .vote-card img{width:100%;aspect-ratio:1/1;object-fit:contain;border-radius:10px;display:block;background:#fff;}
+  .vote-card .who{font-size:13px;font-weight:600;color:var(--ink-soft);margin-top:8px;}
+  .vote-card .vote-btn{margin-top:8px;width:100%;padding:9px;border-radius:10px;background:var(--accent);color:#fff;font-weight:600;font-size:13px;}
+  .vote-card .vote-btn:hover:not(:disabled){background:var(--accent-hi);}
+  .vote-card .vote-btn:disabled{background:var(--surface-2);color:var(--ink-soft);cursor:default;}
+  .vote-card.chosen{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .vote-count{font-size:12px;color:var(--ink-soft);margin-top:6px;font-weight:600;}
+  .crown{position:absolute;top:-12px;left:50%;transform:translateX(-50%);font-size:22px;}
+  .muted-row{grid-column:1/-1;text-align:center;color:var(--ink-soft);padding:24px 0;font-size:14px;}
+
+  /* ---------- host ---------- */
+  .host-wrap{
+    padding:26px;min-height:100vh;
+    background:
+      radial-gradient(900px 600px at 12% -5%, rgba(124,108,240,.32), transparent 60%),
+      radial-gradient(800px 500px at 95% 8%, rgba(59,163,163,.2), transparent 55%),
+      linear-gradient(165deg,#131a2e 0%,#151327 55%,#0d1120 100%);
+    color:#eef1f8;
+  }
+  .host-top{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:start;margin-bottom:26px;}
+  .glass{
+    background:rgba(255,255,255,.055);
+    border:1px solid rgba(255,255,255,.11);
+    border-radius:var(--radius-lg);
+    box-shadow:var(--shadow-lg);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  }
+  .qr-box{padding:18px;text-align:center;flex:0 0 auto;}
+  .qr-box .eyebrow{color:rgba(238,241,248,.6);margin-bottom:10px;}
+  #qrcode{
+    display:flex;justify-content:center;background:#fff;padding:10px;border-radius:12px;
+    max-width:168px;margin:0 auto;color:#0f1729;font-size:10px;word-break:break-all;
+  }
+  #qrcode img, #qrcode canvas{display:block;}
+  .qr-box .hint{font-size:12px;color:rgba(238,241,248,.55);margin-top:10px;max-width:170px;line-height:1.45;}
+
+  .control-panel{padding:20px 22px;}
+  .control-panel .eyebrow{color:rgba(238,241,248,.6);}
+  .control-panel .field{
+    background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#fff;
+    margin-top:8px;font-size:17px;font-family:'Space Grotesk','Inter',sans-serif;
+  }
+  .control-panel .field:focus{border-color:var(--accent-hi);box-shadow:0 0 0 3px rgba(124,108,240,.25);}
+  .control-panel .field::placeholder{color:rgba(238,241,248,.4);}
+  .control-panel .btn.secondary{background:rgba(255,255,255,.09);color:#eef1f8;border-color:rgba(255,255,255,.16);box-shadow:none;}
+  .control-panel .btn.secondary:hover{background:rgba(255,255,255,.16);}
+  .control-panel .btn.ghost{color:rgba(238,241,248,.7);}
+  .control-panel .btn.ghost:hover{background:rgba(255,255,255,.1);color:#fff;}
+  .control-panel input[type=number]{
+    width:66px;padding:8px 10px;border-radius:10px;font-size:14px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);color:#fff;
+  }
+  .control-row{display:flex;gap:9px;margin-top:12px;align-items:center;flex-wrap:wrap;}
+  .control-row .lbl{font-size:13px;color:rgba(238,241,248,.7);font-weight:500;}
+  .save-hint{font-size:12px;font-weight:600;min-height:16px;margin-top:6px;color:var(--warn);}
+  .save-hint.saved{color:#63d69c;}
+  .phase-row{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+    margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);
+  }
+  .phase-badge{display:inline-block;padding:5px 12px;border-radius:999px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;}
+  .phase-badge.drawing{background:rgba(99,214,156,.16);color:#7fe3ac;}
+  .phase-badge.voting{background:rgba(245,165,36,.16);color:#f7c46c;}
+  .phase-badge.results{background:rgba(124,108,240,.2);color:#b3a7ff;}
+  .host-timer{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;margin-left:10px;font-family:'Space Grotesk','Inter',sans-serif;}
+  .data-note{
+    margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);
+    font-size:12px;color:rgba(238,241,248,.55);display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  }
+
+  .sec-panel{padding:14px 18px;margin-bottom:22px;}
+  .sec-panel summary{
+    list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-size:13px;color:rgba(238,241,248,.75);
+  }
+  .sec-panel summary::-webkit-details-marker{display:none;}
+  .sec-chip{
+    display:inline-block;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);
+  }
+  .sec-chip:empty{display:none;}
+  .sec-chip.ok{background:rgba(99,214,156,.14);color:#7fe3ac;border-color:rgba(99,214,156,.3);}
+  .sec-chip.warn{background:rgba(245,165,36,.15);color:#f7c46c;border-color:rgba(245,165,36,.32);}
+  .sec-more{margin-left:auto;font-weight:600;color:rgba(238,241,248,.55);}
+  .sec-body{margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);}
+  .sec-lead{font-size:13.5px;line-height:1.6;color:rgba(238,241,248,.75);margin:0 0 12px;max-width:76ch;}
+  .sec-lead.sec-warn{color:#f7c46c;}
+  .sec-lead strong{color:#fff;}
+  .sec-steps{font-size:13.5px;line-height:1.8;color:rgba(238,241,248,.75);margin:0 0 14px;padding-left:20px;max-width:76ch;}
+  .sec-steps strong{color:#fff;}
+  .sec-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .sec-row .field{flex:1 1 240px;background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#fff;font-size:14px;}
+  .sec-row .field::placeholder{color:rgba(238,241,248,.4);}
+  .sec-row .eyebrow{color:rgba(238,241,248,.6);}
+  .sec-uid{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    background:rgba(255,255,255,.09);padding:6px 10px;border-radius:8px;word-break:break-all;
+  }
+  .sec-note{font-size:12px;color:rgba(238,241,248,.5);margin:0 0 14px;max-width:76ch;line-height:1.6;}
+  .sec-rules{
+    background:rgba(5,8,20,.5);border:1px solid rgba(255,255,255,.1);border-radius:12px;
+    padding:14px;font-size:11.5px;line-height:1.55;color:#c9d2e6;overflow-x:auto;margin:0;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;max-height:340px;overflow-y:auto;
+  }
+
+  .picker-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px;}
+  .picker-head h2{margin:0 0 2px;}
+  .board-list{display:flex;flex-direction:column;gap:10px;}
+  .board-item{
+    display:flex;align-items:center;gap:10px;padding:12px 14px;
+    border:1px solid var(--line);border-radius:14px;background:var(--surface-2);
+  }
+  .picker-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px;}
+  .picker-row .field{flex:1 1 220px;min-width:0;}
+  .board-item-main{flex:1;min-width:0;}
+  .board-item-name{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .board-item-date{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+  .board-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 4px 16px;flex-wrap:wrap;}
+  .board-title-wrap{display:flex;align-items:baseline;gap:12px;min-width:0;flex-wrap:wrap;}
+  .board-header h1{font-size:22px;margin:0;overflow:hidden;text-overflow:ellipsis;}
+  .board-header .count{font-size:13px;color:rgba(238,241,248,.6);}
+  .board-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .board-actions .btn.secondary{background:rgba(255,255,255,.09);color:#eef1f8;border-color:rgba(255,255,255,.16);box-shadow:none;}
+  .board-actions .btn.secondary:hover{background:rgba(255,255,255,.16);}
+  .board-actions .btn.secondary.active-hide{background:var(--warn);color:#1a1205;border-color:transparent;}
+  .board-actions .btn.ghost{color:rgba(238,241,248,.7);}
+  .board-actions .btn.ghost:hover{background:rgba(255,255,255,.1);color:#fff;}
+
+  /* Hide for a reveal: the cards stay in place, the drawings are unreadable. */
+  #board.drawings-hidden .pin-card img{filter:blur(26px);transform:scale(.96);}
+  #board.drawings-hidden .pin-card .who{visibility:hidden;}
+  #board.drawings-hidden .pin-card .votes-badge{opacity:.35;}
+  #board .pin-card img{transition:filter .35s ease, transform .35s ease;}
+  .hidden-banner{
+    text-align:center;color:rgba(238,241,248,.75);font-size:13px;padding:0 20px 24px;
+  }
+  #board{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px;padding:0 4px 24px;}
+  .pin-card{
+    background:var(--surface);border-radius:16px;padding:10px;position:relative;
+    box-shadow:0 12px 30px rgba(5,8,20,.35);border:1px solid rgba(255,255,255,.08);
+    transition:transform .18s ease;
+  }
+  .pin-card:hover{transform:translateY(-3px);}
+  .pin-card.winner{box-shadow:0 0 0 2px var(--warn), 0 14px 34px rgba(5,8,20,.4);}
+  .pin-card img{width:100%;aspect-ratio:1/1;object-fit:contain;display:block;border-radius:10px;background:#fff;}
+  .pin-card .who{
+    display:flex;align-items:center;gap:7px;margin-top:9px;padding:0 2px;
+    font-size:13px;font-weight:600;color:var(--ink-soft);
+  }
+  .pin-card .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+  .pin-card .votes-badge{
+    position:absolute;top:16px;right:16px;background:rgba(15,23,41,.78);color:#fff;
+    font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;backdrop-filter:blur(6px);
+  }
+  .empty-state{color:rgba(238,241,248,.6);text-align:center;padding:64px 20px;font-size:15px;}
+
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
+    background:#0f1729;color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;
+    z-index:999;max-width:90%;text-align:center;box-shadow:var(--shadow-lg);
+    border:1px solid rgba(255,255,255,.12);
+  }
+  /* ---- landscape phones: put the controls in a side rail so the canvas
+          keeps the full height instead of being squeezed to nothing ---- */
+  @media (orientation:landscape) and (max-height:600px){
+    .draw-shell{
+      display:grid;
+      grid-template-columns:1fr minmax(210px, 38vw);
+      grid-template-rows:auto 1fr auto;
+      grid-template-areas:"canvas top" "canvas tools" "canvas bottom";
+      padding-right:env(safe-area-inset-right);
+    }
+    .db-top{
+      grid-area:top;padding:8px 12px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);
+      padding-top:calc(8px + env(safe-area-inset-top));
+    }
+    .db-top .topic-text{font-size:15px;white-space:normal;overflow:visible;max-height:2.6em;}
+    .canvas-area{grid-area:canvas;padding:8px;}
+    .db-toolbar{
+      grid-area:tools;border-top:none;border-left:1px solid var(--line);
+      overflow-y:auto;padding:8px;
+    }
+    .db-toolbar .tool-row{flex-wrap:wrap;overflow:visible;gap:6px;}
+    .db-toolbar .tool-row + .tool-row{margin-top:6px;}
+    /* tighten everything so the whole toolset fits without scrolling */
+    .db-toolbar .swatch,
+    .db-toolbar .color-picker-wrap{width:24px;height:24px;}
+    .db-toolbar .recent-swatches{gap:6px;}
+    .db-toolbar .tool-btn{padding:6px 9px;font-size:11.5px;}
+    .db-toolbar .size-btn{width:27px;height:27px;}
+    .db-bottom{
+      grid-area:bottom;flex-wrap:wrap;border-left:1px solid var(--line);padding:7px;gap:6px;
+    }
+    /* one row, so the vertical space goes to the tools instead */
+    .db-bottom .field{flex:1 1 90px;min-width:80px;padding:9px 11px;}
+    .db-bottom .btn{flex:0 0 auto;padding:9px 12px;}
+  }
+
+  @media (max-width:720px){
+    .host-wrap{padding:16px;}
+    .host-top{grid-template-columns:1fr;}
+    .qr-box{display:flex;align-items:center;gap:16px;text-align:left;}
+    .qr-box .hint{max-width:none;margin-top:4px;}
+  }
 </style>
 </head>
 <body>
@@ -127,8 +393,31 @@
   const params = new URLSearchParams(window.location.search);
   const isHost = params.get('host') === '1';
   const dbUrl = params.get('db');
+  const apiKey = params.get('key');          /* present => accounts + locked down */
+  const boardId = params.get('b');           /* which presenter's board this is */
   const app = document.getElementById('app');
   const POLL_MS = 4000;
+
+  /* Every presenter gets their own board. Links made before boards existed
+     have no id and keep using the original top-level paths. */
+  function bp(path){ return boardId ? 'boards/' + boardId + '/' + path : path; }
+
+  /* The host holds the door open in slices while the board is on screen, so an
+     old QR code is dead a short while after the presentation ends. */
+  const SESSION_WINDOW_MS = 30*60000;
+  const HEARTBEAT_MS = 5*60000;
+
+  /* Fixed drawing resolution. The backing store is NEVER resized after creation,
+     so an iOS URL-bar collapse or keyboard opening can't rescale (squash) artwork. */
+  const CANVAS_SIZE = 1200;
+  const EXPORT_SIZE = 800;
+  const EXPORT_QUALITY = 0.72;
+
+  function esc(str){
+    return String(str == null ? '' : str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
 
   function showToast(msg){
     const t = document.createElement('div');
@@ -147,47 +436,247 @@
   function fmtTime(ms){
     if(ms < 0) ms = 0;
     const s = Math.floor(ms/1000);
-    const m = Math.floor(s/60);
-    const rem = s % 60;
-    return m + ':' + String(rem).padStart(2,'0');
+    return Math.floor(s/60) + ':' + String(s % 60).padStart(2,'0');
   }
 
+  /* ---------- anonymous sign-in (Identity Toolkit REST, no SDK) ----------
+     Every guest silently gets a Firebase identity when they open the QR link.
+     It proves the write came from a real client of this project; the session
+     window below is what decides *when* those clients are allowed to write. */
+  const AUTH_ENABLED = !!apiKey;
+  const LS_KEY = 'drawTopicAuth:' + (apiKey || '');
+  const auth = { idToken:null, refreshToken:null, uid:null, email:null, isAnon:true, expiresAt:0, error:null };
+
+  function storeAuth(){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        refreshToken:auth.refreshToken, uid:auth.uid, email:auth.email, isAnon:auth.isAnon
+      }));
+    }catch(e){}
+  }
+  function clearAuth(){
+    auth.idToken = null; auth.refreshToken = null; auth.uid = null;
+    auth.email = null; auth.isAnon = true; auth.expiresAt = 0; auth.error = null;
+    try{ localStorage.removeItem(LS_KEY); }catch(e){}
+  }
+  (function loadStoredAuth(){
+    if(!AUTH_ENABLED) return;
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(raw){
+        const o = JSON.parse(raw);
+        auth.refreshToken = o.refreshToken || null;
+        auth.uid = o.uid || null;
+        auth.email = o.email || null;
+        auth.isAnon = o.isAnon !== false;
+      }
+    }catch(e){}
+  })();
+
+  async function idpCall(method, payload){
+    const res = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:' + method + '?key=' + encodeURIComponent(apiKey), {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(()=>({}));
+    return { ok: res.ok, data };
+  }
+  function applyIdpSession(data, isAnon){
+    auth.idToken = data.idToken; auth.refreshToken = data.refreshToken; auth.uid = data.localId;
+    auth.email = data.email || null; auth.isAnon = isAnon;
+    auth.expiresAt = Date.now() + (parseInt(data.expiresIn,10) || 3600) * 1000;
+    auth.error = null; storeAuth();
+  }
+
+  async function signInAnonymously(){
+    try{
+      const { ok, data } = await idpCall('signUp', { returnSecureToken:true });
+      if(!ok){ auth.error = (data.error && data.error.message) || 'SIGN_IN_FAILED'; return false; }
+      applyIdpSession(data, true);
+      return true;
+    }catch(e){ auth.error = 'NETWORK'; return false; }
+  }
+
+  /* Hosts use a real account, so their identity — and the boards they own —
+     follow them to any device instead of living in one browser. */
+  async function signInWithPassword(email, password, isNewAccount){
+    try{
+      const { ok, data } = await idpCall(isNewAccount ? 'signUp' : 'signInWithPassword',
+        { email, password, returnSecureToken:true });
+      if(!ok) return { ok:false, code:(data.error && data.error.message) || 'SIGN_IN_FAILED' };
+      applyIdpSession(data, false);
+      return { ok:true };
+    }catch(e){ return { ok:false, code:'NETWORK' }; }
+  }
+
+  async function sendPasswordReset(email){
+    try{
+      const { ok, data } = await idpCall('sendOobCode', { requestType:'PASSWORD_RESET', email });
+      return { ok, code:(data.error && data.error.message) || '' };
+    }catch(e){ return { ok:false, code:'NETWORK' }; }
+  }
+
+  async function refreshIdToken(){
+    if(!auth.refreshToken) return false;
+    try{
+      const res = await fetch('https://securetoken.googleapis.com/v1/token?key=' + encodeURIComponent(apiKey), {
+        method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({ grant_type:'refresh_token', refresh_token: auth.refreshToken })
+      });
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok){ auth.refreshToken = null; return false; }
+      auth.idToken = data.id_token; auth.refreshToken = data.refresh_token; auth.uid = data.user_id;
+      auth.expiresAt = Date.now() + (parseInt(data.expires_in,10) || 3600) * 1000;
+      auth.error = null; storeAuth(); return true;
+    }catch(e){ return false; }
+  }
+
+  let authPromise = null;
+  async function getIdToken(){
+    if(!AUTH_ENABLED) return null;
+    if(auth.idToken && Date.now() < auth.expiresAt - 300000) return auth.idToken;
+    if(!authPromise){
+      /* Guests are signed in silently; hosts are never auto-signed-in, so the
+         board can ask them for their account instead. */
+      authPromise = (async ()=>{
+        if(await refreshIdToken()) return;
+        if(!isHost) await signInAnonymously();
+      })().finally(()=>{ authPromise = null; });
+    }
+    await authPromise;
+    return auth.idToken;
+  }
+
+  function isSignedInHost(){ return !!(auth.idToken && !auth.isAnon); }
+
   /* ---------- Firebase Realtime Database storage layer ---------- */
-  function nodeUrl(path){ return dbUrl.replace(/\/$/, '') + '/' + path + '.json'; }
+  let readDenied = false;    /* rules refused the last read (session closed) */
+  let writeDenied = false;
+  let serverSkew = 0;        /* rules compare against server time, not ours */
+
+  function serverNow(){ return Date.now() + serverSkew; }
+  function noteServerTime(res){
+    const d = res.headers.get('date');
+    if(d){ const t = Date.parse(d); if(!isNaN(t)) serverSkew = t - Date.now(); }
+  }
+  function isDenied(res){ return res.status === 401 || res.status === 403; }
+
+  async function nodeUrl(path){
+    const base = dbUrl.replace(/\/$/, '') + '/' + path + '.json';
+    const token = await getIdToken();
+    return token ? base + '?auth=' + encodeURIComponent(token) : base;
+  }
 
   async function dbGet(path){
     try{
-      const res = await fetch(nodeUrl(path));
+      const res = await fetch(await nodeUrl(path));
+      noteServerTime(res);
+      if(isDenied(res)){ readDenied = true; return {}; }
+      readDenied = false;
       if(!res.ok) return {};
       const data = await res.json();
       return data || {};
     }catch(e){ return {}; }
   }
-  async function dbPatch(path, dataObj){
+  async function dbWrite(method, path, dataObj){
     try{
-      const res = await fetch(nodeUrl(path), { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj) });
+      const res = await fetch(await nodeUrl(path), {
+        method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj)
+      });
+      noteServerTime(res);
+      writeDenied = isDenied(res);
       return res.ok;
     }catch(e){ return false; }
   }
-  async function dbPut(path, dataObj){
-    try{
-      const res = await fetch(nodeUrl(path), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj) });
-      return res.ok;
-    }catch(e){ return false; }
-  }
+  async function dbPatch(path, dataObj){ return dbWrite('PATCH', path, dataObj); }
+  async function dbPut(path, dataObj){ return dbWrite('PUT', path, dataObj); }
   async function dbDelete(path){
-    try{ const res = await fetch(nodeUrl(path), { method:'DELETE' }); return res.ok; }catch(e){ return false; }
+    try{
+      const res = await fetch(await nodeUrl(path), { method:'DELETE' });
+      noteServerTime(res);
+      writeDenied = isDenied(res);
+      return res.ok;
+    }catch(e){ return false; }
   }
 
-  const DEFAULT_STATE = { topic: '', phase: 'drawing', timerEnd: null, round: 'r' + Date.now() };
+  /* ---------- session window (host-controlled write gate) ---------- */
+  async function openSessionWindow(){ return dbPut(bp('session/openUntil'), serverNow() + SESSION_WINDOW_MS); }
+  async function closeSessionWindow(){ return dbPut(bp('session/openUntil'), 0); }
+  async function getSessionOpenUntil(){
+    const v = await dbGet(bp('session/openUntil'));
+    return typeof v === 'number' ? v : 0;
+  }
+
+  /* ---------- boards: one per presenter, so several people can run their own
+     night off the same deployment without touching each other's drawings ---- */
+  function newBoardId(){ return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+  async function listMyBoards(){
+    if(!auth.uid) return [];
+    const obj = await dbGet('users/' + auth.uid + '/boards');
+    return Object.keys(obj)
+      .map(id=>({ id, ...obj[id] }))
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }
+  async function createBoard(name){
+    const id = newBoardId();
+    const createdAt = Date.now();
+    const clean = (name || '').trim() || 'Untitled board';
+    /* Claim it first — the rules only accept an owner while there isn't one. */
+    if(!(await dbPut('boards/' + id + '/owner', auth.uid))) return null;
+    await dbPut('boards/' + id + '/meta', { name: clean, createdAt });
+    await dbPut('boards/' + id + '/state', { ...DEFAULT_STATE, round: 'r' + createdAt, roundStartedAt: createdAt });
+    await dbPut('users/' + auth.uid + '/boards/' + id, { name: clean, createdAt });
+    return id;
+  }
+  async function deleteBoard(id){
+    const ok = await dbDelete('boards/' + id);
+    await dbDelete('users/' + auth.uid + '/boards/' + id);
+    return ok;
+  }
+  async function getBoardMeta(){
+    if(!boardId) return null;
+    const m = await dbGet(bp('meta'));
+    return m && m.name ? m : null;
+  }
+  function boardUrl(id){
+    const url = new URL(window.location.href);
+    url.searchParams.set('host', '1');
+    url.searchParams.set('b', id);
+    return url.toString();
+  }
+
+  function authErrorText(code){
+    switch(code){
+      case 'EMAIL_EXISTS': return 'That email already has an account — try signing in instead.';
+      case 'EMAIL_NOT_FOUND':
+      case 'INVALID_PASSWORD':
+      case 'INVALID_LOGIN_CREDENTIALS': return 'Email or password not recognised.';
+      case 'OPERATION_NOT_ALLOWED': return 'Email sign-in is not enabled for this Firebase project yet.';
+      case 'TOO_MANY_ATTEMPTS_TRY_LATER': return 'Too many attempts — wait a minute and try again.';
+      case 'MISSING_PASSWORD': return 'Enter a password.';
+      case 'INVALID_EMAIL': return 'That does not look like an email address.';
+      case 'NETWORK': return 'Could not reach Firebase — check your connection.';
+      default:
+        if((code||'').startsWith('WEAK_PASSWORD')) return 'Use a password of at least 6 characters.';
+        return 'Could not sign in (' + (code || 'unknown error') + ').';
+    }
+  }
+
+  const DEFAULT_STATE = { topic: '', phase: 'drawing', timerEnd: null, round: 'r0', roundStartedAt: 0 };
   async function getState(){
-    const obj = await dbGet('state');
-    if(obj && obj.phase) return obj;
+    const obj = await dbGet(bp('state'));
+    if(obj && obj.phase) return { ...DEFAULT_STATE, ...obj };
     return { ...DEFAULT_STATE };
   }
-  async function setState(state){ return await dbPut('state', state); }
+  async function setState(state){ return await dbPut(bp('state'), state); }
 
-  function getVoterId(){
+  /* Locked down, the vote key is the signed-in uid so the rules can enforce
+     one vote per person. Otherwise fall back to a per-tab random id. */
+  async function getVoterId(){
+    if(AUTH_ENABLED){
+      await getIdToken();
+      if(auth.uid) return auth.uid;
+    }
     let id = window.name && window.name.startsWith('voter:') ? window.name.slice(6) : null;
     if(!id){ id = 'v' + Math.random().toString(36).slice(2,10); window.name = 'voter:' + id; }
     return id;
@@ -196,14 +685,23 @@
   function getMyVote(round){ return window[getMyVoteKey(round)] || null; }
   function setMyVote(round, submissionKey){ window[getMyVoteKey(round)] = submissionKey; }
 
-  async function fetchBoard(){
-    const obj = await dbGet('board');
-    const items = Object.keys(obj).map(k=>({ key:k, ...obj[k] }));
+  /* An entry belongs to the current round only if it is tagged with this round,
+     or (for entries written before round tagging) was created after it started. */
+  function isCurrentRound(item, state){
+    if(!state) return true;
+    if(item && item.round) return item.round === state.round;
+    if(state.roundStartedAt) return (item && item.ts || 0) >= state.roundStartedAt;
+    return true;
+  }
+
+  async function fetchBoard(state){
+    const obj = await dbGet(bp('board'));
+    const items = Object.keys(obj).map(k=>({ key:k, ...obj[k] })).filter(i=>isCurrentRound(i, state));
     return items.sort((a,b)=>(b.ts||0)-(a.ts||0));
   }
-  async function fetchVotes(){
-    const obj = await dbGet('votes');
-    return Object.keys(obj).map(k=>obj[k]);
+  async function fetchVotes(state){
+    const obj = await dbGet(bp('votes'));
+    return Object.keys(obj).map(k=>obj[k]).filter(v=>isCurrentRound(v, state));
   }
   function tallyVotes(votes){
     const counts = {};
@@ -211,12 +709,41 @@
     return counts;
   }
 
-  /* ================= SETUP SCREEN (host, no pantry id yet) ================= */
+  /* Remove everything the current round doesn't need. Returns true when the
+     database is confirmed clean. */
+  async function wipeRoundData(){
+    await dbDelete(bp('board'));
+    await dbDelete(bp('votes'));
+    let board = await dbGet(bp('board'));
+    let votes = await dbGet(bp('votes'));
+    if(Object.keys(board).length || Object.keys(votes).length){
+      await dbDelete(bp('board'));
+      await dbDelete(bp('votes'));
+      board = await dbGet(bp('board'));
+      votes = await dbGet(bp('votes'));
+    }
+    return Object.keys(board).length === 0 && Object.keys(votes).length === 0;
+  }
+
+  /* Safety net: drop any leftovers from previous rounds that survived a failed
+     or interrupted wipe, so old drawings never sit in Firebase. */
+  async function purgeStaleData(state){
+    const stale = [];
+    const board = await dbGet(bp('board'));
+    Object.keys(board).forEach(k=>{ if(!isCurrentRound(board[k], state)) stale.push(bp('board/'+k)); });
+    const votes = await dbGet(bp('votes'));
+    Object.keys(votes).forEach(k=>{ if(!isCurrentRound(votes[k], state)) stale.push(bp('votes/'+k)); });
+    for(const path of stale){ await dbDelete(path); }
+    return stale.length;
+  }
+
+  /* ================= SETUP SCREEN ================= */
   function renderSetup(){
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card">
-          <h2 class="hand">One-time setup</h2>
+          <h2>One-time setup</h2>
+          <p class="sub">Connect a free Firebase Realtime Database to hold this session's drawings.</p>
           <ol>
             <li>Go to <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a> and sign in with any Google account.</li>
             <li>Click <strong>Add project</strong>, give it any name, and you can skip Google Analytics.</li>
@@ -224,9 +751,15 @@
             <li>Copy the database URL shown at the top of that page (looks like <code>https://yourproject-default-rtdb.firebaseio.com</code>).</li>
             <li>Paste it below and click Connect.</li>
           </ol>
-          <label style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:700;">Firebase Database URL</label>
-          <input id="pantryInput" type="text" placeholder="https://yourproject-default-rtdb.firebaseio.com">
-          <div style="margin-top:14px;"><button class="btn" id="connectBtn">Connect</button></div>
+          <label class="eyebrow" for="pantryInput">Firebase Database URL</label>
+          <input id="pantryInput" class="field" style="margin-top:8px;" type="text" placeholder="https://yourproject-default-rtdb.firebaseio.com">
+          <div style="margin-top:16px;">
+            <label class="eyebrow" for="apiKeySetup">Web API key <span style="text-transform:none;letter-spacing:0;font-weight:500;">— optional, locks the board down</span></label>
+            <input id="apiKeySetup" class="field" style="margin-top:8px;" type="text" placeholder="AIza… (leave blank to start in test mode)">
+            <p class="sub" style="margin:10px 0 0;font-size:13px;">With a key, guests are signed in anonymously behind the scenes and can only add drawings while your board is open — no login for them, and the link goes dead after your session. You can add this later from the board.</p>
+            <p class="sub" style="margin:8px 0 0;font-size:12.5px;">Find it in <strong>Project settings → General → Your apps</strong>. If there is no app listed, register a web app first (the <code>&lt;/&gt;</code> icon) — the key is the <code>apiKey</code> line in the config it shows you.</p>
+          </div>
+          <div style="margin-top:18px;"><button class="btn" id="connectBtn">Connect</button></div>
           <div class="err" id="setupErr"></div>
         </div>
       </div>
@@ -239,32 +772,221 @@
       const url = new URL(window.location.href);
       url.searchParams.set('db', val);
       url.searchParams.set('host', '1');
+      const key = document.getElementById('apiKeySetup').value.trim();
+      if(key) url.searchParams.set('key', key);
       window.location.href = url.toString();
     });
   }
 
+  /* ================= HOST SIGN-IN ================= */
+  function renderHostAuth(){
+    let mode = 'signin';
+    function paint(){
+      const isNew = mode === 'signup';
+      app.innerHTML = `
+        <div class="setup-wrap">
+          <div class="setup-card">
+            <h2>${isNew ? 'Create a host account' : 'Host sign-in'}</h2>
+            <p class="sub">${isNew
+              ? 'Your account keeps your boards with you, on any device you present from.'
+              : 'Sign in to open your boards. Guests never sign in — they just scan your QR code.'}</p>
+            <label class="eyebrow" for="hostEmail">Email</label>
+            <input id="hostEmail" class="field" style="margin:8px 0 14px;" type="email" autocomplete="email" placeholder="you@example.com">
+            <label class="eyebrow" for="hostPass">Password</label>
+            <input id="hostPass" class="field" style="margin:8px 0 4px;" type="password"
+                   autocomplete="${isNew ? 'new-password' : 'current-password'}" placeholder="${isNew ? 'At least 6 characters' : 'Your password'}">
+            <div class="err" id="authErr"></div>
+            <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <button class="btn" id="authGo">${isNew ? 'Create account' : 'Sign in'}</button>
+              <button class="btn ghost small" id="authSwap">${isNew ? 'I already have an account' : 'Create an account'}</button>
+              ${isNew ? '' : '<button class="btn ghost small" id="authReset">Forgot password</button>'}
+            </div>
+          </div>
+        </div>`;
+
+      const emailEl = document.getElementById('hostEmail');
+      const passEl = document.getElementById('hostPass');
+      const errEl = document.getElementById('authErr');
+
+      async function submit(){
+        const email = emailEl.value.trim();
+        const password = passEl.value;
+        if(!email || !password){ errEl.textContent = 'Enter your email and password.'; return; }
+        const btn = document.getElementById('authGo');
+        btn.disabled = true; btn.textContent = '…';
+        const res = await signInWithPassword(email, password, isNew);
+        if(!res.ok){
+          errEl.textContent = authErrorText(res.code);
+          btn.disabled = false; btn.textContent = isNew ? 'Create account' : 'Sign in';
+          return;
+        }
+        startHost();
+      }
+      document.getElementById('authGo').addEventListener('click', submit);
+      passEl.addEventListener('keydown', e=>{ if(e.key === 'Enter') submit(); });
+      document.getElementById('authSwap').addEventListener('click', ()=>{ mode = isNew ? 'signin' : 'signup'; paint(); });
+      const resetBtn = document.getElementById('authReset');
+      if(resetBtn){
+        resetBtn.addEventListener('click', async ()=>{
+          const email = emailEl.value.trim();
+          if(!email){ errEl.textContent = 'Enter your email first, then press Forgot password.'; return; }
+          const r = await sendPasswordReset(email);
+          errEl.textContent = r.ok ? '' : authErrorText(r.code);
+          if(r.ok) showToast('Password reset email sent to ' + email);
+        });
+      }
+    }
+    paint();
+  }
+
+  /* ================= BOARD PICKER ================= */
+  async function renderBoardPicker(){
+    app.innerHTML = `
+      <div class="setup-wrap">
+        <div class="setup-card">
+          <div class="picker-head">
+            <div>
+              <h2>Your boards</h2>
+              <p class="sub" style="margin:0;">Signed in as ${esc(auth.email || '')}</p>
+            </div>
+            <button class="btn ghost small" id="signOutBtn">Sign out</button>
+          </div>
+          <div id="boardList" class="board-list"><p class="sub">Loading…</p></div>
+          <div class="picker-row">
+            <input id="newBoardName" class="field" type="text" maxlength="40" placeholder="New board name (e.g. Friday Presentation Night)">
+            <button class="btn" id="createBoardBtn">Create board</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('signOutBtn').addEventListener('click', ()=>{
+      clearAuth();
+      const url = new URL(window.location.href);
+      url.searchParams.delete('b');
+      window.location.href = url.toString();
+    });
+
+    async function paintList(){
+      const listEl = document.getElementById('boardList');
+      const boards = await listMyBoards();
+      if(readDenied){
+        listEl.innerHTML = '<p class="err">Firebase refused this account. Publish the database rules from the README, then reload.</p>';
+        return;
+      }
+      if(!boards.length){
+        listEl.innerHTML = '<p class="sub">No boards yet — create your first one below.</p>';
+        return;
+      }
+      listEl.innerHTML = boards.map(b=>`
+        <div class="board-item">
+          <div class="board-item-main">
+            <div class="board-item-name">${esc(b.name || 'Untitled board')}</div>
+            <div class="board-item-date">${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}</div>
+          </div>
+          <button class="btn small" data-open="${esc(b.id)}">Open</button>
+          <button class="btn ghost small" data-del="${esc(b.id)}">Delete</button>
+        </div>`).join('');
+      listEl.querySelectorAll('[data-open]').forEach(el=>{
+        el.addEventListener('click', ()=>{ window.location.href = boardUrl(el.getAttribute('data-open')); });
+      });
+      listEl.querySelectorAll('[data-del]').forEach(el=>{
+        el.addEventListener('click', async ()=>{
+          const id = el.getAttribute('data-del');
+          if(!confirm('Delete this board?\n\nIts drawings and votes are removed from Firebase.')) return;
+          el.disabled = true;
+          await deleteBoard(id);
+          paintList();
+        });
+      });
+    }
+    paintList();
+
+    document.getElementById('createBoardBtn').addEventListener('click', async ()=>{
+      const btn = document.getElementById('createBoardBtn');
+      btn.disabled = true; btn.textContent = 'Creating…';
+      const id = await createBoard(document.getElementById('newBoardName').value);
+      if(!id){
+        btn.disabled = false; btn.textContent = 'Create board';
+        showToast('Could not create the board — check the database rules are published.');
+        return;
+      }
+      window.location.href = boardUrl(id);
+    });
+  }
+
+  async function startHost(){
+    /* Test mode has no accounts: one shared board, exactly as before. */
+    if(!AUTH_ENABLED){ renderHostView(); return; }
+    await getIdToken();
+    if(!isSignedInHost()){ renderHostAuth(); return; }
+    if(!boardId){ renderBoardPicker(); return; }
+    renderHostView();
+  }
+
   /* ================= DRAW VIEW (participant) ================= */
   let drawLastPhase = null;
+  let drawLastRound = null;
 
   function renderDrawShell(){
     app.innerHTML = `<div id="drawInner"></div>`;
   }
 
+  let closedShown = false;
+
+  function renderClosedScreen(){
+    if(closedShown) return;
+    closedShown = true;
+    const inner = document.getElementById('drawInner');
+    if(!inner) return;
+    const why = auth.error === 'OPERATION_NOT_ALLOWED'
+      ? 'Anonymous sign-in is not switched on for this board yet — the host needs to enable it in Firebase.'
+      : 'The host has not opened this session yet, or it has already finished. Leave this page open — it will spring to life when the board goes up.';
+    inner.innerHTML = `
+      <div class="draw-wrap">
+        <div class="confirm">
+          <div class="stamp" style="background:linear-gradient(140deg,#5c6780,#8b95ad);box-shadow:none;">🔒</div>
+          <h2>This session is closed</h2>
+          <p>${esc(why)}</p>
+        </div>
+      </div>`;
+  }
+
   async function drawPollLoop(){
     const state = await getState();
-    if(state.phase !== drawLastPhase){
+
+    /* Rules refuse reads outside the host's session window. */
+    if(readDenied){
+      renderClosedScreen();
+      drawLastPhase = null; drawLastRound = null;
+      setTimeout(drawPollLoop, POLL_MS);
+      return;
+    }
+    closedShown = false;
+
+    const roundChanged = state.round !== drawLastRound;
+    if(state.phase !== drawLastPhase || roundChanged){
       drawLastPhase = state.phase;
+      drawLastRound = state.round;
       if(state.phase === 'drawing') renderDrawingPhase(state);
       else if(state.phase === 'voting') await renderVotingPhase(state);
       else if(state.phase === 'results') await renderResultsPhase(state);
     } else if(state.phase === 'drawing'){
+      /* Update in place — re-rendering here would wipe the drawing in progress. */
       updateDrawTimer(state);
+      updateDrawTopic(state);
     } else if(state.phase === 'voting'){
       await renderVotingPhase(state);
     } else if(state.phase === 'results'){
       await renderResultsPhase(state);
     }
     setTimeout(drawPollLoop, POLL_MS);
+  }
+
+  function topicText(state){ return state.topic || 'Draw whatever comes to mind!'; }
+
+  function updateDrawTopic(state){
+    const el = document.querySelector('.topic-text');
+    if(el && el.textContent !== topicText(state)) el.textContent = topicText(state);
   }
 
   function updateDrawTimer(state){
@@ -313,20 +1035,26 @@
         <div class="db-top">
           <div style="min-width:0;">
             <span class="eyebrow">Topic</span>
-            <div class="topic-text">${(state.topic || 'Draw whatever comes to mind!').replace(/</g,'&lt;')}</div>
+            <div class="topic-text">${esc(topicText(state))}</div>
           </div>
           <div class="timer-pill" id="drawTimerPill" style="display:none;"></div>
         </div>
-        <div class="canvas-area">
-          <canvas id="canvas"></canvas>
-          <canvas id="overlay"></canvas>
+        <div class="canvas-area" id="canvasArea">
+          <div class="canvas-stage" id="canvasStage">
+            <canvas id="canvas"></canvas>
+            <canvas id="overlay"></canvas>
+          </div>
         </div>
         <div class="db-toolbar">
+          <div class="tool-row" id="recentRow" style="display:none;">
+            <span class="tool-label">Recent</span>
+            <div class="recent-swatches" id="recentSwatches"></div>
+          </div>
           <div class="tool-row" id="colorRow"></div>
           <div class="tool-row" id="modeRow"></div>
         </div>
         <div class="db-bottom">
-          <input id="nameInput" type="text" maxlength="24" placeholder="Your name (optional)">
+          <input id="nameInput" class="field" type="text" maxlength="24" placeholder="Your name (optional)">
           <button class="btn secondary" id="clearBtn">Clear</button>
           <button class="btn" id="submitBtn">Add</button>
         </div>
@@ -334,58 +1062,103 @@
     `;
     updateDrawTimer(state);
 
-    const canvasArea = inner.querySelector('.canvas-area');
+    const area = document.getElementById('canvasArea');
+    const stage = document.getElementById('canvasStage');
     const canvas = document.getElementById('canvas');
     const overlay = document.getElementById('overlay');
     const ctx = canvas.getContext('2d');
     const octx = overlay.getContext('2d');
 
-    function sizeCanvases(){
-      const rect = canvasArea.getBoundingClientRect();
-      const w = Math.max(1, Math.round(rect.width));
-      const h = Math.max(1, Math.round(rect.height));
-      if(canvas.width === w && canvas.height === h) return;
-      let prev = null;
-      if(canvas.width > 0 && canvas.height > 0){
-        try { prev = ctx.getImageData(0,0,canvas.width,canvas.height); } catch(e){ prev = null; }
-      }
-      const oldW = canvas.width, oldH = canvas.height;
-      [canvas, overlay].forEach(c=>{ c.width = w; c.height = h; });
-      ctx.fillStyle = '#ffffff'; ctx.fillRect(0,0,w,h);
-      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      if(prev){
-        const tmp = document.createElement('canvas');
-        tmp.width = oldW; tmp.height = oldH;
-        tmp.getContext('2d').putImageData(prev, 0, 0);
-        ctx.drawImage(tmp, 0, 0, oldW, oldH, 0, 0, w, h);
-      }
-    }
-    sizeCanvases();
-    window.addEventListener('resize', sizeCanvases);
+    /* Backing store is created once at a fixed size and left alone forever. */
+    [canvas, overlay].forEach(c=>{ c.width = CANVAS_SIZE; c.height = CANVAS_SIZE; });
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-    const colors = ['#2b2118','#ffffff','#c1443c','#e0743c','#e0a12a','#e8d24a','#5fae5f','#3e7c59','#3ba3a3','#3b5a8a','#6a4fb0','#c15a9e','#8a5a3c'];
+    /* Only the CSS box changes when the viewport moves — pixels are never rescaled. */
+    function layoutStage(){
+      const cs = getComputedStyle(area);
+      const availW = area.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const availH = area.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const size = Math.max(80, Math.floor(Math.min(availW, availH)));
+      stage.style.width = size + 'px';
+      stage.style.height = size + 'px';
+    }
+    layoutStage();
+    window.addEventListener('resize', layoutStage);
+    window.addEventListener('orientationchange', layoutStage);
+    if(window.visualViewport) window.visualViewport.addEventListener('resize', layoutStage);
+    if(window.ResizeObserver) new ResizeObserver(layoutStage).observe(area);
+
+    const colors = ['#0f1729','#ffffff','#e5484d','#f76b15','#f5a524','#ecd94a','#5fae5f','#2f9e68','#3ba3a3','#3b5a8a','#5b5bd6','#c15a9e','#8a5a3c'];
     let currentColor = colors[0];
     const colorRow = document.getElementById('colorRow');
+
+    /* The three colours this person reached for most recently, kept for the
+       length of the session so they don't hunt through the palette again. */
+    const RECENT_KEY = 'drawTopicRecent:' + (boardId || 'default');
+    const RECENT_MAX = 3;
+    let recentColors = [];
+    try{
+      const raw = localStorage.getItem(RECENT_KEY);
+      if(raw) recentColors = (JSON.parse(raw) || []).filter(c=>/^#[0-9a-f]{6}$/i.test(c)).slice(0, RECENT_MAX);
+    }catch(e){ recentColors = []; }
+
+    function noteRecentColor(c){
+      const norm = String(c).toLowerCase();
+      recentColors = [norm, ...recentColors.filter(x=>x !== norm)].slice(0, RECENT_MAX);
+      try{ localStorage.setItem(RECENT_KEY, JSON.stringify(recentColors)); }catch(e){}
+      paintRecent();
+    }
+    function paintRecent(){
+      const row = document.getElementById('recentRow');
+      const wrap = document.getElementById('recentSwatches');
+      if(!row || !wrap) return;
+      if(!recentColors.length){ row.style.display = 'none'; return; }
+      row.style.display = '';
+      wrap.innerHTML = '';
+      recentColors.forEach(c=>{
+        const s = document.createElement('button');
+        s.type = 'button';
+        s.className = 'swatch' + (c === String(currentColor).toLowerCase() ? ' active' : '');
+        s.style.background = c;
+        s.setAttribute('aria-label', 'Recent colour ' + c);
+        s.addEventListener('click', ()=>{ pickColor(c); });
+        wrap.appendChild(s);
+      });
+    }
+    /* One place every colour choice goes through, so recents stay honest. */
+    function pickColor(c, opts){
+      currentColor = c;
+      [...colorRow.querySelectorAll('.swatch')].forEach(el=>{
+        el.classList.toggle('active', el.dataset.color === String(c).toLowerCase());
+      });
+      if(currentMode === 'eraser') setMode('pen');
+      if(!opts || opts.remember !== false) noteRecentColor(c);
+      else paintRecent();
+    }
     colors.forEach((c,i)=>{
-      const s = document.createElement('div');
+      const s = document.createElement('button');
+      s.type = 'button';
       s.className = 'swatch' + (i===0 ? ' active' : '');
       s.style.background = c;
-      if(c === '#ffffff') s.style.boxShadow = 'inset 0 0 0 1px #ddd';
-      s.addEventListener('click', ()=>{ currentColor = c; [...colorRow.querySelectorAll('.swatch')].forEach(el=>el.classList.remove('active')); s.classList.add('active'); });
+      s.dataset.color = c.toLowerCase();
+      s.setAttribute('aria-label', 'Colour ' + c);
+      s.addEventListener('click', ()=> pickColor(c));
       colorRow.appendChild(s);
     });
     const pickerWrap = document.createElement('div');
     pickerWrap.className = 'color-picker-wrap';
-    pickerWrap.innerHTML = `<input type="color" id="customColor" value="#2b2118">`;
+    pickerWrap.innerHTML = `<input type="color" id="customColor" value="#0f1729" aria-label="Custom colour">`;
     colorRow.appendChild(pickerWrap);
-    document.getElementById('customColor').addEventListener('input', (e)=>{
-      currentColor = e.target.value;
-      [...colorRow.querySelectorAll('.swatch')].forEach(el=>el.classList.remove('active'));
-    });
+    /* 'input' fires all through the drag, so only record once it settles. */
+    document.getElementById('customColor').addEventListener('input', (e)=> pickColor(e.target.value, {remember:false}));
+    document.getElementById('customColor').addEventListener('change', (e)=> pickColor(e.target.value));
 
     const modeRow = document.getElementById('modeRow');
     const modes = [
       {id:'pen', label:'✏️ Pen'},
+      {id:'eraser', label:'🧽 Eraser'},
       {id:'line', label:'／ Line'},
       {id:'rect', label:'▭ Rect'},
       {id:'circle', label:'◯ Circle'},
@@ -393,122 +1166,196 @@
       {id:'star', label:'★ Star'}
     ];
     let currentMode = 'pen';
+    const modeBtns = {};
     modes.forEach((m,i)=>{
-      const b = document.createElement('div');
-      b.className = 'mode-btn' + (i===0 ? ' active' : '');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tool-btn' + (i===0 ? ' active' : '');
       b.textContent = m.label;
-      b.addEventListener('click', ()=>{ currentMode = m.id; [...modeRow.querySelectorAll('.mode-btn')].forEach(el=>el.classList.remove('active')); b.classList.add('active'); });
+      b.addEventListener('click', ()=> setMode(m.id));
+      modeBtns[m.id] = b;
       modeRow.appendChild(b);
     });
-    const divider1 = document.createElement('div'); divider1.className = 'divider'; modeRow.appendChild(divider1);
+    modeRow.appendChild(Object.assign(document.createElement('div'), {className:'divider'}));
 
     let fillMode = false;
-    const fillBtn = document.createElement('div');
-    fillBtn.className = 'mode-btn';
+    const fillBtn = document.createElement('button');
+    fillBtn.type = 'button';
+    fillBtn.className = 'tool-btn';
     fillBtn.textContent = '⬛ Fill';
     fillBtn.addEventListener('click', ()=>{ fillMode = !fillMode; fillBtn.classList.toggle('active', fillMode); });
     modeRow.appendChild(fillBtn);
-    const divider2 = document.createElement('div'); divider2.className = 'divider'; modeRow.appendChild(divider2);
+    modeRow.appendChild(Object.assign(document.createElement('div'), {className:'divider'}));
 
-    const sizes = [3,7,14];
+    function setMode(id){
+      currentMode = id;
+      Object.keys(modeBtns).forEach(k=> modeBtns[k].classList.toggle('active', k === id));
+      /* Fill only applies to closed shapes. */
+      const fillable = ['rect','circle','triangle','star'].includes(id);
+      fillBtn.classList.toggle('disabled', !fillable);
+    }
+    setMode('pen');
+
+    const sizes = [3,8,18];
     let currentSize = sizes[1];
     sizes.forEach((sz,i)=>{
-      const b = document.createElement('div');
+      const b = document.createElement('button');
+      b.type = 'button';
       b.className = 'size-btn' + (i===1 ? ' active' : '');
-      b.innerHTML = `<span style="width:${sz}px;height:${sz}px;"></span>`;
-      b.addEventListener('click', ()=>{ currentSize = sz; [...modeRow.querySelectorAll('.size-btn')].forEach(el=>el.classList.remove('active')); b.classList.add('active'); });
+      b.setAttribute('aria-label', 'Brush size ' + sz);
+      b.innerHTML = `<span style="width:${Math.round(sz*0.8)}px;height:${Math.round(sz*0.8)}px;"></span>`;
+      b.addEventListener('click', ()=>{
+        currentSize = sz;
+        [...modeRow.querySelectorAll('.size-btn')].forEach(el=>el.classList.remove('active'));
+        b.classList.add('active');
+      });
       modeRow.appendChild(b);
     });
 
-    let drawing=false, startX=0, startY=0, lastX=0, lastY=0;
+    paintRecent();
+
+    /* Canvas pixels are 1200×1200 regardless of how big the stage is on screen. */
+    function strokeWidth(){ return currentMode === 'eraser' ? currentSize * 3 : currentSize; }
+    function strokeColor(){ return currentMode === 'eraser' ? '#ffffff' : currentColor; }
+
+    let hasDrawn = false;
+    let drawing = false, activePointer = null, startX = 0, startY = 0, lastX = 0, lastY = 0;
+
     function pos(e){
-      const rect=overlay.getBoundingClientRect();
-      const sx = overlay.width / rect.width;
-      const sy = overlay.height / rect.height;
-      const t=e.touches?e.touches[0]:e;
-      return {x:(t.clientX-rect.left)*sx, y:(t.clientY-rect.top)*sy};
+      const rect = overlay.getBoundingClientRect();
+      const sx = CANVAS_SIZE / rect.width;
+      const sy = CANVAS_SIZE / rect.height;
+      return { x:(e.clientX - rect.left) * sx, y:(e.clientY - rect.top) * sy };
     }
     function start(e){
-      e.preventDefault(); drawing=true;
-      const p=pos(e); startX=p.x; startY=p.y; lastX=p.x; lastY=p.y;
+      if(drawing) return;                 /* ignore extra fingers / palm touches */
+      e.preventDefault();
+      drawing = true; activePointer = e.pointerId; hasDrawn = true;
+      const p = pos(e); startX = p.x; startY = p.y; lastX = p.x; lastY = p.y;
+      if(overlay.setPointerCapture){ try{ overlay.setPointerCapture(e.pointerId); }catch(err){} }
+      if(currentMode === 'pen' || currentMode === 'eraser'){
+        /* A tap with no movement should still leave a dot. */
+        ctx.strokeStyle = strokeColor(); ctx.lineWidth = strokeWidth();
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x + 0.01, p.y); ctx.stroke();
+      }
     }
     function move(e){
-      if(!drawing) return; e.preventDefault();
-      const p=pos(e);
-      if(currentMode === 'pen'){
-        ctx.strokeStyle=currentColor; ctx.lineWidth=currentSize;
+      if(!drawing || e.pointerId !== activePointer) return;
+      e.preventDefault();
+      const p = pos(e);
+      if(currentMode === 'pen' || currentMode === 'eraser'){
+        ctx.strokeStyle = strokeColor(); ctx.lineWidth = strokeWidth();
         ctx.beginPath(); ctx.moveTo(lastX,lastY); ctx.lineTo(p.x,p.y); ctx.stroke();
-        lastX=p.x; lastY=p.y;
+        lastX = p.x; lastY = p.y;
       } else {
-        octx.clearRect(0,0,overlay.width,overlay.height);
+        octx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
         drawShape(octx, currentMode, startX, startY, p.x, p.y, currentColor, currentSize, fillMode);
       }
     }
     function end(e){
-      if(!drawing) return;
-      if(currentMode !== 'pen'){
-        const p = pos(e.changedTouches ? {touches:e.changedTouches} : e);
+      if(!drawing || (e.pointerId != null && e.pointerId !== activePointer)) return;
+      if(currentMode !== 'pen' && currentMode !== 'eraser'){
+        const p = pos(e);
         drawShape(ctx, currentMode, startX, startY, p.x, p.y, currentColor, currentSize, fillMode);
-        octx.clearRect(0,0,overlay.width,overlay.height);
+        octx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
       }
-      drawing=false;
+      drawing = false; activePointer = null;
     }
-    overlay.addEventListener('mousedown',start); overlay.addEventListener('mousemove',move); window.addEventListener('mouseup',end);
-    overlay.addEventListener('touchstart',start,{passive:false}); overlay.addEventListener('touchmove',move,{passive:false}); overlay.addEventListener('touchend',end);
+    overlay.addEventListener('pointerdown', start);
+    overlay.addEventListener('pointermove', move);
+    overlay.addEventListener('pointerup', end);
+    overlay.addEventListener('pointercancel', end);
+    overlay.addEventListener('contextmenu', e=>e.preventDefault());
 
-    document.getElementById('clearBtn').addEventListener('click', ()=>{ ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,canvas.width,canvas.height); });
+    document.getElementById('clearBtn').addEventListener('click', ()=>{
+      if(hasDrawn && !confirm('Clear the whole drawing?')) return;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
+      octx.clearRect(0,0,CANVAS_SIZE,CANVAS_SIZE);
+      hasDrawn = false;
+    });
+
+    /* Downscale before upload — full-resolution base64 would bloat the database. */
+    function exportDrawing(){
+      const out = document.createElement('canvas');
+      out.width = EXPORT_SIZE; out.height = EXPORT_SIZE;
+      const octx2 = out.getContext('2d');
+      octx2.fillStyle = '#ffffff';
+      octx2.fillRect(0,0,EXPORT_SIZE,EXPORT_SIZE);
+      octx2.imageSmoothingEnabled = true;
+      octx2.imageSmoothingQuality = 'high';
+      octx2.drawImage(canvas, 0, 0, EXPORT_SIZE, EXPORT_SIZE);
+      return out.toDataURL('image/jpeg', EXPORT_QUALITY);
+    }
+
     document.getElementById('submitBtn').addEventListener('click', async ()=>{
       const btn = document.getElementById('submitBtn');
+      if(!hasDrawn){ showToast('Draw something first!'); return; }
       btn.disabled = true; btn.textContent = '…';
       const name = document.getElementById('nameInput').value.trim() || 'Anonymous';
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      const latest = await getState();
       const key = 'd' + Date.now() + Math.random().toString(36).slice(2,8);
-      const ok = await dbPatch('board', { [key]: { name, dataUrl, ts: Date.now() } });
-      if(!ok){ btn.disabled=false; btn.textContent='Add'; showToast('Could not save — the board may be full, or check your connection.'); return; }
+      /* Written at its exact path so the rules validate this one drawing. */
+      const ok = await dbPut(bp('board/' + key), { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round });
+      if(!ok){
+        btn.disabled = false; btn.textContent = 'Add';
+        showToast(writeDenied ? 'The host has closed this session — nothing can be added right now.'
+                              : 'Could not save — check your connection and try again.');
+        return;
+      }
       const inner2 = document.getElementById('drawInner');
-      inner2.innerHTML = `<div class="draw-wrap"><div class="confirm"><div class="stamp">📌</div><h2>Added to the board!</h2><p>Your drawing just showed up on the big screen.</p><div style="margin-top:22px;"><button class="btn" id="drawAgain">Draw another</button></div></div></div>`;
+      inner2.innerHTML = `
+        <div class="draw-wrap">
+          <div class="confirm">
+            <div class="stamp">✓</div>
+            <h2>Added to the board!</h2>
+            <p>Your drawing just showed up on the big screen.</p>
+            <div style="margin-top:24px;"><button class="btn" id="drawAgain">Draw another</button></div>
+          </div>
+        </div>`;
       document.getElementById('drawAgain').addEventListener('click', ()=> renderDrawingPhase(state));
     });
   }
 
-
   async function renderVotingPhase(state){
     const round = state.round;
     const myVote = getMyVote(round);
-    const submissions = await fetchBoard();
-    const votes = await fetchVotes();
-    const counts = tallyVotes(votes);
+    const submissions = await fetchBoard(state);
     const inner = document.getElementById('drawInner');
     if(!inner) return;
     inner.innerHTML = `
       <div class="draw-wrap">
-        <div class="topic-card">
+        <div class="panel">
           <div class="eyebrow">Voting is open</div>
-          <h1>Pick your favorite!</h1>
+          <h1>Pick your favourite</h1>
         </div>
         <div class="vote-grid" id="voteGrid"></div>
       </div>
     `;
     const grid = document.getElementById('voteGrid');
     if(submissions.length === 0){
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--ink-soft);">No drawings were submitted this round.</div>';
+      grid.innerHTML = '<div class="muted-row">No drawings were submitted this round.</div>';
       return;
     }
     submissions.forEach(item=>{
       const card = document.createElement('div');
       card.className = 'vote-card' + (myVote === item.key ? ' chosen' : '');
       card.innerHTML = `
-        <img src="${item.dataUrl}" alt="Drawing by ${item.name}">
-        <div class="who">${item.name}</div>
+        <img src="${esc(item.dataUrl)}" alt="Drawing by ${esc(item.name)}">
+        <div class="who">${esc(item.name)}</div>
         <button class="vote-btn" ${myVote ? 'disabled' : ''}>${myVote === item.key ? 'Voted ✓' : (myVote ? 'Voting closed' : 'Vote for this')}</button>
       `;
       const btn = card.querySelector('.vote-btn');
       if(!myVote){
         btn.addEventListener('click', async ()=>{
           btn.disabled = true; btn.textContent = 'Saving…';
-          const voterId = getVoterId();
-          const ok = await dbPatch('votes', { [voterId]: { choice: item.key, ts: Date.now() } });
-          if(!ok){ showToast('Vote did not save — try again.'); btn.disabled=false; btn.textContent='Vote for this'; return; }
+          const voterId = await getVoterId();
+          const ok = await dbPut(bp('votes/' + voterId), { choice: item.key, ts: Date.now(), round });
+          if(!ok){
+            showToast(writeDenied ? 'Voting is closed for this session.' : 'Vote did not save — try again.');
+            btn.disabled = false; btn.textContent = 'Vote for this';
+            return;
+          }
           setMyVote(round, item.key);
           renderVotingPhase(state);
         });
@@ -518,8 +1365,8 @@
   }
 
   async function renderResultsPhase(state){
-    const submissions = await fetchBoard();
-    const votes = await fetchVotes();
+    const submissions = await fetchBoard(state);
+    const votes = await fetchVotes(state);
     const counts = tallyVotes(votes);
     const ranked = [...submissions].sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0));
     const topCount = ranked.length ? (counts[ranked[0].key]||0) : 0;
@@ -527,20 +1374,20 @@
     if(!inner) return;
     inner.innerHTML = `
       <div class="draw-wrap">
-        <div class="topic-card"><div class="eyebrow">Results</div><h1>🏆 Top drawings</h1></div>
+        <div class="panel"><div class="eyebrow">Results</div><h1>🏆 Top drawings</h1></div>
         <div class="vote-grid" id="resultsGrid"></div>
       </div>
     `;
     const grid = document.getElementById('resultsGrid');
-    if(ranked.length === 0){ grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--ink-soft);">No drawings this round.</div>'; return; }
+    if(ranked.length === 0){ grid.innerHTML = '<div class="muted-row">No drawings this round.</div>'; return; }
     ranked.forEach(item=>{
       const c = counts[item.key] || 0;
       const card = document.createElement('div');
       card.className = 'vote-card';
       card.innerHTML = `
         ${c === topCount && topCount > 0 ? '<div class="crown">👑</div>' : ''}
-        <img src="${item.dataUrl}" alt="Drawing by ${item.name}">
-        <div class="who">${item.name}</div>
+        <img src="${esc(item.dataUrl)}" alt="Drawing by ${esc(item.name)}">
+        <div class="who">${esc(item.name)}</div>
         <div class="vote-count">${c} vote${c===1?'':'s'}</div>
       `;
       grid.appendChild(card);
@@ -548,59 +1395,152 @@
   }
 
   /* ================= HOST VIEW ================= */
+  let topicDirty = false;      /* host is editing — never overwrite from the poll */
+  let lastRemoteTopic = null;
+  let lastPurgedRound = null;
+  let lastPurgeAt = 0;
+  let sessionHeldOpen = true;   /* false once the host closes the door by hand */
+  let drawingsHidden = false;
+
+  function applyHiddenState(){
+    const boardEl = document.getElementById('board');
+    const banner = document.getElementById('hiddenBanner');
+    const btn = document.getElementById('hideBtn');
+    if(!boardEl || !btn) return;
+    boardEl.classList.toggle('drawings-hidden', drawingsHidden);
+    btn.textContent = drawingsHidden ? '👁 Show drawings' : '🙈 Hide drawings';
+    btn.classList.toggle('active-hide', drawingsHidden);
+    const anyCards = boardEl.children.length > 0;
+    if(banner) banner.style.display = (drawingsHidden && anyCards) ? 'block' : 'none';
+  }
+
+  /* Purging re-reads the board, so only do it when the round changes (right
+     after a wipe) and as a slow background sweep after that. */
+  const PURGE_SWEEP_MS = 60000;
+  async function maybePurge(state){
+    const roundChanged = state.round !== lastPurgedRound;
+    if(!roundChanged && Date.now() - lastPurgeAt < PURGE_SWEEP_MS) return;
+    lastPurgedRound = state.round;
+    lastPurgeAt = Date.now();
+    await purgeStaleData(state);
+  }
+
   async function renderHostView(){
     app.innerHTML = `
       <div class="host-wrap">
         <div class="host-top">
-          <div class="qr-box">
-            <div class="eyebrow">Scan to draw</div>
-            <div id="qrcode"></div>
+          <div class="qr-box glass">
+            <div>
+              <div class="eyebrow">Scan to draw</div>
+              <div id="qrcode"></div>
+            </div>
             <div class="hint">No app, no login — opens straight to the canvas.</div>
           </div>
-          <div class="control-panel">
-            <label>Topic</label>
-            <input id="topicInput" type="text" maxlength="60" placeholder="e.g. Draw your favorite animal">
+          <div class="control-panel glass">
+            <label class="eyebrow" for="topicInput">Topic</label>
+            <input id="topicInput" class="field" type="text" maxlength="60" placeholder="e.g. Draw your favourite animal">
+            <div class="save-hint" id="topicHint"></div>
             <div class="control-row">
               <button class="btn small" id="saveTopicBtn">Update topic</button>
               <button class="btn secondary small" id="downloadBtn">Download board image</button>
             </div>
             <div class="control-row">
-              <label style="text-transform:none;font-weight:600;">Timer</label>
-              <input id="minutesInput" type="number" min="1" max="60" value="3"> min
+              <span class="lbl">Timer</span>
+              <input id="minutesInput" type="number" min="1" max="60" value="3" aria-label="Timer minutes">
+              <span class="lbl">min</span>
               <button class="btn small" id="startTimerBtn">Start drawing timer</button>
             </div>
             <div class="phase-row">
               <div>
                 <span class="phase-badge" id="phaseBadge">drawing</span>
-                <span class="host-timer" id="hostTimer" style="margin-left:10px;"></span>
+                <span class="host-timer" id="hostTimer"></span>
               </div>
               <div class="control-row" style="margin:0;">
                 <button class="btn small" id="votingBtn">Open voting</button>
-                <button class="btn small" id="resultsBtn">Show results</button>
-                <button class="btn secondary small" id="newRoundBtn">New round</button>
+                <button class="btn secondary small" id="resultsBtn">Show results</button>
+                <button class="btn ghost small" id="newRoundBtn">New round</button>
               </div>
+            </div>
+            <div class="data-note">
+              <span>🗑️ Drawings and votes are deleted from Firebase whenever you start a new round.</span>
+              <button class="btn danger small" id="wipeBtn">Erase all data now</button>
+              <button class="btn danger small" id="closeSessionBtn" style="display:none;">Close session</button>
             </div>
           </div>
         </div>
-        <div class="board-header"><h1 class="hand">The board</h1><div class="count" id="countText">0 drawings</div></div>
+        <details class="glass sec-panel" id="secPanel">
+          <summary>
+            <span id="secMode" class="sec-chip">Checking…</span>
+            <span id="secSession" class="sec-chip"></span>
+            <span class="sec-more">Security &amp; access ▾</span>
+          </summary>
+          <div class="sec-body" id="secBody"></div>
+        </details>
+        <div class="board-header">
+          <div class="board-title-wrap">
+            <h1 id="boardTitle">The board</h1>
+            <span class="count" id="countText">0 drawings</span>
+          </div>
+          <div class="board-actions">
+            <button class="btn secondary small" id="hideBtn">🙈 Hide drawings</button>
+            <button class="btn ghost small" id="switchBoardBtn" style="display:none;">Switch board</button>
+            <button class="btn ghost small" id="signOutBtn2" style="display:none;">Sign out</button>
+          </div>
+        </div>
         <div id="board"></div>
-        <div class="empty-state" id="emptyState" style="display:none;"><div class="hand">Nothing here yet — scan the QR code to add the first drawing!</div></div>
+        <div class="hidden-banner" id="hiddenBanner" style="display:none;">Drawings are hidden — press Show drawings for the reveal.</div>
+        <div class="empty-state" id="emptyState" style="display:none;">Nothing here yet — scan the QR code to add the first drawing.</div>
       </div>
     `;
 
-    try {
-      new QRCode(document.getElementById('qrcode'), { text: participantUrl(), width: 150, height: 150, colorDark: '#2b2118', colorLight: '#fffdf6' });
-    } catch(e){ document.getElementById('qrcode').textContent = participantUrl(); }
+    /* The QR library is deferred, so draw as soon as it turns up and fall back
+       to the plain link if it never does. */
+    function renderQr(){
+      const el = document.getElementById('qrcode');
+      if(!el) return true;
+      if(typeof QRCode === 'undefined'){ el.textContent = participantUrl(); return false; }
+      try{
+        el.textContent = '';
+        new QRCode(el, { text: participantUrl(), width: 148, height: 148, colorDark: '#0f1729', colorLight: '#ffffff' });
+        return true;
+      }catch(e){ el.textContent = participantUrl(); return false; }
+    }
+    if(!renderQr()){
+      window.addEventListener('load', renderQr, { once:true });
+      setTimeout(renderQr, 1500);
+      setTimeout(renderQr, 5000);
+    }
 
-    document.getElementById('saveTopicBtn').addEventListener('click', async ()=>{
-      const val = document.getElementById('topicInput').value.trim();
+    const topicInput = document.getElementById('topicInput');
+    const topicHint = document.getElementById('topicHint');
+
+    function setHint(msg, saved){
+      topicHint.textContent = msg;
+      topicHint.classList.toggle('saved', !!saved);
+    }
+    topicInput.addEventListener('input', ()=>{
+      topicDirty = true;
+      setHint('Unsaved — press Enter or Update topic', false);
+    });
+    topicInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') saveTopic(); });
+
+    async function saveTopic(){
+      const val = topicInput.value.trim();
       const state = await getState();
       state.topic = val;
       const ok = await setState(state);
-      if(!ok) showToast('Could not update topic — check your connection.');
-    });
+      if(!ok){ setHint('Could not save — check your connection', false); showToast('Could not update topic — check your connection.'); return; }
+      /* Only stop protecting the field once the new value is safely stored. */
+      topicDirty = false;
+      lastRemoteTopic = val;
+      setHint('Topic updated ✓', true);
+      setTimeout(()=>{ if(!topicDirty) setHint('', false); }, 2500);
+    }
+    document.getElementById('saveTopicBtn').addEventListener('click', saveTopic);
+
     document.getElementById('startTimerBtn').addEventListener('click', async ()=>{
       const mins = Math.max(1, parseInt(document.getElementById('minutesInput').value, 10) || 3);
+      await reopenSession();
       const state = await getState();
       state.phase = 'drawing';
       state.timerEnd = Date.now() + mins*60000;
@@ -617,15 +1557,37 @@
       await setState(state);
     });
     document.getElementById('newRoundBtn').addEventListener('click', async ()=>{
-      if(!confirm('Start a fresh round? This clears every drawing and vote from the board.')) return;
-      await dbDelete('board');
-      await dbDelete('votes');
+      if(!confirm('Start a fresh round?\n\nEvery drawing and vote from this round is permanently deleted from Firebase.')) return;
+      const btn = document.getElementById('newRoundBtn');
+      btn.disabled = true; btn.textContent = 'Clearing…';
+      await reopenSession();
+      const clean = await wipeRoundData();
       const state = await getState();
-      state.phase = 'drawing'; state.timerEnd = null; state.round = 'r' + Date.now();
+      state.phase = 'drawing';
+      state.timerEnd = null;
+      state.round = 'r' + Date.now();
+      state.roundStartedAt = Date.now();
       await setState(state);
+      btn.disabled = false; btn.textContent = 'New round';
+      showToast(clean ? 'New round started — previous drawings deleted.' : 'New round started, but some data could not be deleted. Retrying in the background.');
+    });
+    document.getElementById('wipeBtn').addEventListener('click', async ()=>{
+      if(!confirm('Erase all data?\n\nThis deletes every drawing, vote and the current topic from Firebase.')) return;
+      const btn = document.getElementById('wipeBtn');
+      btn.disabled = true; btn.textContent = 'Erasing…';
+      const clean = await wipeRoundData();
+      const fresh = { ...DEFAULT_STATE, round: 'r' + Date.now(), roundStartedAt: Date.now() };
+      await setState(fresh);
+      topicDirty = false; lastRemoteTopic = null;
+      btn.disabled = false; btn.textContent = 'Erase all data now';
+      showToast(clean ? 'All drawings and votes erased from Firebase.' : 'Some data could not be erased — check your connection.');
     });
     document.getElementById('downloadBtn').addEventListener('click', ()=>{
-      html2canvas(document.querySelector('.host-wrap'), {backgroundColor:null, scale:2}).then(canvas=>{
+      if(typeof html2canvas === 'undefined'){
+        showToast('Board capture needs its library — check your connection, or take a screenshot instead.');
+        return;
+      }
+      html2canvas(document.querySelector('.host-wrap'), {backgroundColor:'#131a2e', scale:2}).then(canvas=>{
         const link = document.createElement('a');
         link.download = 'topic-drawing-board.png';
         link.href = canvas.toDataURL('image/png');
@@ -633,12 +1595,228 @@
       }).catch(()=>{ showToast('Could not capture the board image — try a regular screenshot instead.'); });
     });
 
+    /* Hide the board for a reveal, or to stop guests copying each other. */
+    const hideBtn = document.getElementById('hideBtn');
+    hideBtn.addEventListener('click', ()=>{
+      drawingsHidden = !drawingsHidden;
+      applyHiddenState();
+    });
+
+    if(isSignedInHost()){
+      const switchBtn = document.getElementById('switchBoardBtn');
+      const outBtn = document.getElementById('signOutBtn2');
+      switchBtn.style.display = '';
+      outBtn.style.display = '';
+      switchBtn.addEventListener('click', ()=>{
+        const url = new URL(window.location.href);
+        url.searchParams.delete('b');
+        window.location.href = url.toString();
+      });
+      outBtn.addEventListener('click', ()=>{
+        clearAuth();
+        const url = new URL(window.location.href);
+        url.searchParams.delete('b');
+        window.location.href = url.toString();
+      });
+      getBoardMeta().then(meta=>{
+        const t = document.getElementById('boardTitle');
+        if(meta && meta.name && t) t.textContent = meta.name;
+      });
+    }
+
+    const closeBtn = document.getElementById('closeSessionBtn');
+    if(AUTH_ENABLED){
+      closeBtn.style.display = '';
+      closeBtn.addEventListener('click', async ()=>{
+        if(!confirm('Close this session?\n\nGuests will not be able to add drawings or vote until you reopen the board.')) return;
+        sessionHeldOpen = false;
+        const ok = await closeSessionWindow();
+        showToast(ok ? 'Session closed — the QR code no longer accepts drawings.' : 'Could not close the session — check your connection.');
+      });
+    }
+
+    renderSecurityPanel();
+    /* Hold the door open while the board is on screen; it lapses on its own
+       once the board is closed, so an old QR code goes dead by itself. */
+    await openSessionWindow();
+    setInterval(()=>{ if(sessionHeldOpen) openSessionWindow(); }, HEARTBEAT_MS);
+
     hostPollLoop();
   }
 
+  /* Starting a round or a timer means the host is running the board again. */
+  async function reopenSession(){
+    sessionHeldOpen = true;
+    await openSessionWindow();
+  }
+
+  const RULES_TEMPLATE = `{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "boards": {
+      "$b": {
+        ".read": "auth != null && (root.child('boards').child($b).child('owner').val() === auth.uid || root.child('boards').child($b).child('session/openUntil').val() > now)",
+        ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid",
+
+        "owner": {
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid",
+          ".validate": "newData.isString()"
+        },
+
+        "meta": {
+          ".validate": "newData.hasChildren(['name'])",
+          "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        },
+
+        "session": {
+          "openUntil": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        },
+
+        "state": {
+          ".validate": "newData.hasChildren(['phase', 'round'])"
+        },
+
+        "board": {
+          "$drawing": {
+            ".write": "auth != null && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+            ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
+            "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
+            "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
+            "ts":      { ".validate": "newData.isNumber()" },
+            "round":   { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
+            "$other":  { ".validate": false }
+          }
+        },
+
+        "votes": {
+          "$voter": {
+            ".write": "auth != null && $voter === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+            ".validate": "newData.hasChildren(['choice', 'ts', 'round'])",
+            "choice": { ".validate": "newData.isString() && root.child('boards').child($b).child('board').child(newData.val()).exists()" },
+            "ts":     { ".validate": "newData.isNumber()" },
+            "round":  { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+  function rulesForHost(){ return RULES_TEMPLATE; }
+
+  async function renderSecurityPanel(){
+    const body = document.getElementById('secBody');
+    if(!body) return;
+    if(AUTH_ENABLED) await getIdToken();
+
+    if(!AUTH_ENABLED){
+      body.innerHTML = `
+        <p class="sec-lead">This board is running in <strong>test mode</strong>: anyone who has the database URL can read, add or delete drawings, at any time of day.</p>
+        <p class="sec-lead">Locking it down also unlocks host accounts and separate boards per presenter. Guests still just scan and draw — no login, no prompt.</p>
+        <ol class="sec-steps">
+          <li>In Firebase: <strong>Build → Authentication → Get started</strong>, then enable both <strong>Anonymous</strong> (for guests) and <strong>Email/Password</strong> (for hosts).</li>
+          <li>In <strong>Project settings → General → Your apps</strong>, click the web icon <code>&lt;/&gt;</code> to register a web app if you have not already (any nickname, skip Hosting). Firebase then shows a config snippet.</li>
+          <li>Copy the <code>apiKey</code> value from that snippet — it starts with <code>AIza</code> — and paste it below. It is safe to share; your database rules do the protecting.</li>
+          <li>Come back here and copy the database rules into <strong>Realtime Database → Rules</strong>.</li>
+        </ol>
+        <div class="sec-row">
+          <input id="apiKeyInput" class="field" type="text" placeholder="Web API key (AIza…)">
+          <button class="btn small" id="apiKeyBtn">Turn on locked-down mode</button>
+        </div>`;
+      document.getElementById('apiKeyBtn').addEventListener('click', ()=>{
+        const val = document.getElementById('apiKeyInput').value.trim();
+        if(!val){ showToast('Paste your Web API key first.'); return; }
+        const url = new URL(window.location.href);
+        url.searchParams.set('key', val);
+        window.location.href = url.toString();
+      });
+      return;
+    }
+
+    if(auth.error){
+      const msg = auth.error === 'OPERATION_NOT_ALLOWED'
+        ? 'Anonymous sign-in is not enabled yet. In Firebase go to <strong>Build → Authentication → Sign-in method → Anonymous → Enable</strong>, then reload this page.'
+        : 'Could not sign in to Firebase (' + esc(auth.error) + '). Check the Web API key in this page\'s address.';
+      body.innerHTML = `<p class="sec-lead sec-warn">${msg}</p>`;
+      return;
+    }
+
+    body.innerHTML = `
+      <p class="sec-lead">Guests are signed in anonymously and can only add drawings while <strong>this</strong> board is open. You own this board through your account, so it follows you to any device you present from — and other presenters' boards stay separate from yours.</p>
+      <div class="sec-row">
+        <span class="eyebrow">Signed in as</span>
+        <code class="sec-uid">${esc(auth.email || auth.uid || '')}</code>
+      </div>
+      <p class="sec-note">These rules are the same for everyone — there is nothing to fill in. Paste them into <strong>Realtime Database → Rules</strong> in Firebase once, and every board in this project is covered.</p>
+      <div class="sec-row"><button class="btn small" id="copyRulesBtn">Copy database rules</button></div>
+      <pre class="sec-rules" id="secRules">${esc(rulesForHost())}</pre>`;
+
+    async function copy(text, btn, label){
+      try{ await navigator.clipboard.writeText(text); btn.textContent = 'Copied ✓'; }
+      catch(e){ showToast('Copy failed — select the text manually.'); return; }
+      setTimeout(()=>{ btn.textContent = label; }, 2000);
+    }
+    document.getElementById('copyRulesBtn').addEventListener('click', (e)=> copy(rulesForHost(), e.target, 'Copy database rules'));
+  }
+
+  function updateSecurityChips(openUntil){
+    const mode = document.getElementById('secMode');
+    const sess = document.getElementById('secSession');
+    if(!mode || !sess) return;
+    if(!AUTH_ENABLED){
+      mode.textContent = '⚠️ Test mode — open to anyone';
+      mode.className = 'sec-chip warn';
+      sess.textContent = '';
+      return;
+    }
+    mode.textContent = auth.error ? '⚠️ Sign-in problem' : '🔒 Locked down';
+    mode.className = 'sec-chip ' + (auth.error ? 'warn' : 'ok');
+    const open = openUntil > serverNow();
+    sess.textContent = open ? 'Guests can draw · closes ' + new Date(openUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Session closed';
+    sess.className = 'sec-chip ' + (open ? 'ok' : '');
+  }
+
+  let hostDeniedWarned = false;
+
   async function hostPollLoop(){
     const state = await getState();
-    document.getElementById('topicInput').value = state.topic || '';
+
+    /* If the rules reject the host, the host ID in them is not this browser's. */
+    if(readDenied && !hostDeniedWarned){
+      hostDeniedWarned = true;
+      const panel = document.getElementById('secPanel');
+      if(panel) panel.open = true;
+      showToast('Firebase is refusing this board — check the rules use the host ID shown below.');
+    } else if(!readDenied){
+      hostDeniedWarned = false;
+    }
+
+    updateSecurityChips(await getSessionOpenUntil());
+    const topicInput = document.getElementById('topicInput');
+
+    /* Never clobber what the host is typing. Only sync the field when it is
+       untouched and the topic actually changed on the server. */
+    if(topicInput && !topicDirty && document.activeElement !== topicInput){
+      const remote = state.topic || '';
+      if(remote !== lastRemoteTopic){
+        topicInput.value = remote;
+        lastRemoteTopic = remote;
+      }
+    }
+
     const badge = document.getElementById('phaseBadge');
     badge.textContent = state.phase;
     badge.className = 'phase-badge ' + state.phase;
@@ -647,7 +1825,7 @@
     if(state.phase === 'drawing' && state.timerEnd){
       const remaining = state.timerEnd - Date.now();
       timerEl.textContent = fmtTime(remaining);
-      timerEl.style.color = remaining < 15000 ? 'var(--pin-red)' : 'var(--ink)';
+      timerEl.style.color = remaining < 15000 ? 'var(--danger)' : '';
       if(remaining <= 0){
         state.phase = 'voting'; state.timerEnd = null;
         await setState(state);
@@ -656,6 +1834,7 @@
       timerEl.textContent = '';
     }
 
+    await maybePurge(state);
     await refreshHostBoard(state);
     setTimeout(hostPollLoop, POLL_MS);
   }
@@ -664,10 +1843,11 @@
     const boardEl = document.getElementById('board');
     const emptyEl = document.getElementById('emptyState');
     const countEl = document.getElementById('countText');
-    const submissions = await fetchBoard();
+    const submissions = await fetchBoard(state);
 
     if(submissions.length === 0){
       boardEl.innerHTML = ''; emptyEl.style.display = 'block'; countEl.textContent = '0 drawings';
+      applyHiddenState();
       return;
     }
     emptyEl.style.display = 'none';
@@ -676,39 +1856,38 @@
     let counts = {};
     let ordered = submissions;
     if(state.phase === 'voting' || state.phase === 'results'){
-      const votes = await fetchVotes();
+      const votes = await fetchVotes(state);
       counts = tallyVotes(votes);
       if(state.phase === 'results'){
         ordered = [...submissions].sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0));
       }
     }
-    const topCount = state.phase==='results' && ordered.length ? (counts[ordered[0].key]||0) : -1;
-    const pinColors = ['#c1443c','#3e7c59','#3b5a8a','#e0a12a'];
+    const topCount = state.phase === 'results' && ordered.length ? (counts[ordered[0].key]||0) : -1;
+    const dotColors = ['#e5484d','#2f9e68','#5b5bd6','#f5a524','#3ba3a3','#c15a9e'];
 
     boardEl.innerHTML = ordered.map(item=>{
       const h = hashCode(item.key);
-      const rotate = (h % 12) - 6;
-      const pin = pinColors[Math.abs(h) % pinColors.length];
-      const name = (item.name || 'Anonymous').replace(/</g,'&lt;');
+      const dot = dotColors[Math.abs(h) % dotColors.length];
+      const name = esc(item.name || 'Anonymous');
       const isWinner = state.phase === 'results' && topCount > 0 && (counts[item.key]||0) === topCount;
-      const voteBadge = (state.phase === 'voting' || state.phase === 'results') ? `<div class="votes-badge">${counts[item.key]||0}</div>` : '';
+      const voteBadge = (state.phase === 'voting' || state.phase === 'results') ? `<div class="votes-badge">${counts[item.key]||0} ${(counts[item.key]||0)===1?'vote':'votes'}</div>` : '';
       return `
-        <div class="pin-card${isWinner ? ' winner' : ''}" style="transform:rotate(${rotate}deg);">
-          <div class="pin-dot" style="background:${pin};"></div>
-          <img src="${item.dataUrl}" alt="Drawing by ${name}">
-          <div class="who">${name}</div>
+        <div class="pin-card${isWinner ? ' winner' : ''}">
+          <img src="${esc(item.dataUrl)}" alt="Drawing by ${name}">
           ${voteBadge}
+          <div class="who"><span class="dot" style="background:${dot};"></span>${name}${isWinner ? ' 👑' : ''}</div>
         </div>
       `;
     }).join('');
+    applyHiddenState();
   }
 
   /* ================= ROUTER ================= */
   if(!dbUrl){
     if(isHost){ renderSetup(); }
-    else { app.innerHTML = '<div class="setup-wrap"><div class="setup-card"><h2 class="hand">Ask your host for the QR code</h2><p>This link is missing its board address.</p></div></div>'; }
+    else { app.innerHTML = '<div class="setup-wrap"><div class="setup-card"><h2>Ask your host for the QR code</h2><p class="sub">This link is missing its board address.</p></div></div>'; }
   } else if(isHost){
-    renderHostView();
+    startHost();
   } else {
     renderDrawShell();
     drawPollLoop();

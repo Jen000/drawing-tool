@@ -1,0 +1,64 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "boards": {
+      "$b": {
+        ".read": "auth != null && (root.child('boards').child($b).child('owner').val() === auth.uid || root.child('boards').child($b).child('session/openUntil').val() > now)",
+        ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid",
+
+        "owner": {
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid",
+          ".validate": "newData.isString()"
+        },
+
+        "meta": {
+          ".validate": "newData.hasChildren(['name'])",
+          "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        },
+
+        "session": {
+          "openUntil": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        },
+
+        "state": {
+          ".validate": "newData.hasChildren(['phase', 'round'])"
+        },
+
+        "board": {
+          "$drawing": {
+            ".write": "auth != null && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+            ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
+            "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
+            "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
+            "ts":      { ".validate": "newData.isNumber()" },
+            "round":   { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
+            "$other":  { ".validate": false }
+          }
+        },
+
+        "votes": {
+          "$voter": {
+            ".write": "auth != null && $voter === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+            ".validate": "newData.hasChildren(['choice', 'ts', 'round'])",
+            "choice": { ".validate": "newData.isString() && root.child('boards').child($b).child('board').child(newData.val()).exists()" },
+            "ts":     { ".validate": "newData.isNumber()" },
+            "round":  { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
+            "$other": { ".validate": false }
+          }
+        }
+      }
+    }
+  }
+}
