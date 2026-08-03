@@ -61,7 +61,13 @@
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+        "ownBackend": {
+          ".validate": "newData.hasChildren(['dbUrl', 'apiKey'])",
+          "dbUrl":  { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "apiKey": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "$other": { ".validate": false }
+        }
       }
     },
     "boards": {

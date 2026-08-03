@@ -210,9 +210,10 @@ instead of your database URL, which is worth knowing when a deploy misbehaves.
 
 Anyone can point the app at their own Firebase from **Settings**, reached from
 the board list, from `?settings=1`, or by pressing **Sign in** on the landing
-page when no database is configured at all — it is the same button either way,
-it just detours through Settings first if there is nothing to sign in to yet.
-Once saved it is stored on their device only, and while it is set, none of your
+page when no database is configured at all. While signed in on your shared
+instance, saving there links the database to their account — a small record
+under their own `/users/<uid>/ownBackend`, readable only by them — so it
+follows them to any device without retyping it. While it is set, none of your
 limits apply — it is their database and their allowance. A URL with
 `?db=…&key=…` still overrides it, for one-off links.
 

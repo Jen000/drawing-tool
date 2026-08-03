@@ -1626,14 +1626,32 @@
 
   /* Pasting your own Firebase here turns every limit off, because it is then
      your database and your allowance. */
-  function renderSettings(){
+  /* The account's own-database link lives on the SHARED project, under the
+     signed-in user's own record - readable only by them, same rule shape as
+     their board list. Only meaningful while actually authenticated there. */
+  async function fetchLinkedBackend(){
+    if(!auth.uid) return null;
+    const v = await dbGet('users/' + auth.uid + '/ownBackend');
+    return (v && v.dbUrl && v.apiKey) ? v : null;
+  }
+  const RELINK_SUPPRESS_KEY = 'drawTopicNoRelink';
+
+  async function renderSettings(){
     const current = savedBackend();
     const host = (u)=>{ try{ return new URL(u).host; }catch(e){ return u || ''; } };
+
+    /* Writing the link back to the account is only possible while a token
+       for the SHARED project is actually in hand - once a device has already
+       switched over, it is signed into the OWN project instead, and has no
+       way to touch the shared account record from here. */
+    const onShared = !usingOwnBackend && isSignedInHost();
+    const linkedToAccount = onShared ? await fetchLinkedBackend() : null;
+
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card">
           <h2>Your own database</h2>
-          <p class="sub">Point this copy at a Firebase project you own. No limits, no codes, nothing shared — and it stays on this device.</p>
+          <p class="sub">Point this copy at a Firebase project you own. No limits, no codes, nothing shared.</p>
 
           <div class="settings-now">
             <span class="eyebrow">Currently using</span>
@@ -1641,6 +1659,11 @@
               ? esc(host(dbUrl)) + ' <span class="settings-tag">yours</span>'
               : (dbUrl ? esc(host(dbUrl)) + ' <span class="settings-tag shared">shared</span>' : 'nothing yet')}</div>
           </div>
+
+          ${onShared ? `<p class="landing-hint">${linkedToAccount
+              ? 'Saving here updates the database linked to your account — signing in anywhere applies it automatically, nothing to retype.'
+              : 'Saving here links a database to your account, so signing in on any device applies it automatically from then on.'}</p>`
+            : `<p class="landing-hint">This device is already using its own database. Saving here only updates this device's copy of the details — to link a different database to your account, or remove the link entirely, use <strong>Switch to the shared database</strong> below first, then Settings from there.</p>`}
 
           <label class="eyebrow" for="ownDb">Realtime Database URL</label>
           <input id="ownDb" class="field" style="margin:8px 0 14px;" type="text"
@@ -1656,8 +1679,9 @@
             ${BUILT_IN.docsUrl ? `<a href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">Read the guide</a>.` : 'See <code>docs/setup.md</code>.'}</p>
 
           <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="btn" id="saveBackend">Use my database</button>
-            ${current ? '<button class="btn secondary" id="clearBackend">Go back to the shared one</button>' : ''}
+            <button class="btn" id="saveBackend">${onShared ? 'Link my database' : 'Update this device'}</button>
+            ${usingOwnBackend ? '<button class="btn secondary" id="clearBackend">Switch to the shared database</button>' : ''}
+            ${linkedToAccount ? '<button class="btn danger" id="unlinkBackend">Unlink my account</button>' : ''}
             <button class="btn ghost" id="settingsBack">Cancel</button>
           </div>
         </div>
@@ -1673,18 +1697,46 @@
       url.searchParams.set('host', '1');
       window.location.href = url.toString();
     }
-    document.getElementById('saveBackend').addEventListener('click', ()=>{
+    document.getElementById('saveBackend').addEventListener('click', async ()=>{
+      const btn = document.getElementById('saveBackend');
       const db = document.getElementById('ownDb').value.trim().replace(/\/$/, '');
       const key = document.getElementById('ownKey').value.trim();
       const err = document.getElementById('settingsErr');
       if(!db || !key){ err.textContent = 'Both the database URL and the API key are needed.'; return; }
       if(!/^https:\/\//.test(db)){ err.textContent = 'The database URL should start with https://'; return; }
       if(!/firebaseio\.com|firebasedatabase\.app/.test(db)){ err.textContent = 'That does not look like a Realtime Database URL.'; return; }
+      if(onShared){
+        /* Link the account first - if this write fails (rules refused it,
+           offline, whatever) do not leave the device pointed somewhere the
+           account does not agree with. */
+        btn.disabled = true; btn.textContent = 'Linking…';
+        const linked = await dbPut('users/' + auth.uid + '/ownBackend', { dbUrl:db, apiKey:key });
+        if(!linked){
+          err.textContent = 'Could not save to your account — check your connection and try again.';
+          btn.disabled = false; btn.textContent = 'Link my database';
+          return;
+        }
+      }
       if(!saveBackend({ dbUrl:db, apiKey:key })){ err.textContent = 'This browser will not let the setting be saved.'; return; }
       leave();
     });
     const clearBtn = document.getElementById('clearBackend');
-    if(clearBtn) clearBtn.addEventListener('click', ()=>{ saveBackend(null); leave(); });
+    if(clearBtn) clearBtn.addEventListener('click', ()=>{
+      saveBackend(null);
+      /* Otherwise the very next sign-in on the shared instance would read the
+         still-linked account record and bounce straight back here. */
+      sessionStorage.setItem(RELINK_SUPPRESS_KEY, '1');
+      leave();
+    });
+    const unlinkBtn = document.getElementById('unlinkBackend');
+    if(unlinkBtn) unlinkBtn.addEventListener('click', async ()=>{
+      if(!confirm('Unlink your account from that database?\n\nSigning in on other devices will stop switching to it automatically. This device keeps working until you also switch it here.')) return;
+      unlinkBtn.disabled = true;
+      const ok = await dbDelete('users/' + auth.uid + '/ownBackend');
+      if(!ok){ showToast('Could not unlink — check your connection and try again.'); unlinkBtn.disabled = false; return; }
+      showToast('Account unlinked.');
+      renderSettings();
+    });
     document.getElementById('settingsBack').addEventListener('click', ()=> startHost());
   }
 
@@ -1693,6 +1745,21 @@
     if(!AUTH_ENABLED){ renderHostView(); return; }
     await getIdToken();
     if(!isSignedInHost()){ renderHostAuth(); return; }
+
+    /* Signed in on the shared instance: pick up whatever database this
+       account is linked to, so a new device needs the link typed in once,
+       ever - not on every browser it is ever opened from. Skipped right
+       after someone deliberately switches back, so they get one clean look
+       at the shared board picker before any auto-relink kicks in again. */
+    if(!usingOwnBackend && !sessionStorage.getItem(RELINK_SUPPRESS_KEY)){
+      const linked = await fetchLinkedBackend();
+      if(linked && (!backend || backend.dbUrl !== linked.dbUrl || backend.apiKey !== linked.apiKey)){
+        saveBackend(linked);
+        window.location.reload();
+        return;
+      }
+    }
+    sessionStorage.removeItem(RELINK_SUPPRESS_KEY);
 
     await loadAllowance();
     /* No allowance at all is only a wall where one is being enforced; an
@@ -2861,7 +2928,13 @@
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+        "ownBackend": {
+          ".validate": "newData.hasChildren(['dbUrl', 'apiKey'])",
+          "dbUrl":  { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "apiKey": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "$other": { ".validate": false }
+        }
       }
     },
     "boards": {
