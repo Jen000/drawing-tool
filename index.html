@@ -600,10 +600,27 @@
   }
   function isDenied(res){ return res.status === 401 || res.status === 403; }
 
-  async function nodeUrl(path){
+  async function nodeUrl(path, extra){
     const base = dbUrl.replace(/\/$/, '') + '/' + path + '.json';
+    const q = new URLSearchParams();
     const token = await getIdToken();
-    return token ? base + '?auth=' + encodeURIComponent(token) : base;
+    if(token) q.set('auth', token);
+    if(extra) Object.keys(extra).forEach(k=> q.set(k, extra[k]));
+    const qs = q.toString();
+    return qs ? base + '?' + qs : base;
+  }
+
+  /* Keys only, no values — a few bytes per drawing instead of the whole image. */
+  async function dbGetShallow(path){
+    try{
+      const res = await fetch(await nodeUrl(path, { shallow:'true' }));
+      noteServerTime(res);
+      if(isDenied(res)){ readDenied = true; return {}; }
+      readDenied = false;
+      if(!res.ok) return {};
+      const data = await res.json();
+      return data || {};
+    }catch(e){ return {}; }
   }
 
   async function dbGet(path){
@@ -754,10 +771,38 @@
     return true;
   }
 
+  /* A submitted drawing is immutable — the rules refuse any overwrite — so it
+     only ever needs downloading once. Each poll asks for the key list and
+     fetches just the drawings it has not seen, instead of re-downloading every
+     image on every tick. */
+  const boardCache = new Map();
+  function resetBoardCache(){ boardCache.clear(); }
+
   async function fetchBoard(state){
-    const obj = await dbGet(bp('board'));
-    const items = Object.keys(obj).map(k=>({ key:k, ...obj[k] })).filter(i=>isCurrentRound(i, state));
-    return items.sort((a,b)=>(b.ts||0)-(a.ts||0));
+    const keys = await dbGetShallow(bp('board'));
+    if(readDenied) return [];
+
+    for(const k of [...boardCache.keys()]){
+      if(!keys[k]) boardCache.delete(k);            /* cleared or wiped remotely */
+    }
+    const missing = Object.keys(keys).filter(k=>!boardCache.has(k));
+    for(const k of missing){
+      const rec = await dbGet(bp('board/' + k));
+      if(rec && rec.dataUrl) boardCache.set(k, rec);
+    }
+
+    return [...boardCache.entries()]
+      .map(([key, v])=>({ key, ...v }))
+      .filter(i=>isCurrentRound(i, state))
+      .sort((a,b)=>(b.ts||0)-(a.ts||0));
+  }
+
+  /* Cheap fingerprint of what a board view is showing, so an unchanged board
+     does not rebuild its markup (and re-decode every image) every 4 seconds. */
+  function viewSignature(items, counts, extra){
+    return items.map(i=>i.key).join(',') + '|'
+         + items.map(i=>(counts && counts[i.key]) || 0).join(',') + '|'
+         + (extra == null ? '' : extra);
   }
   async function fetchVotes(state){
     const obj = await dbGet(bp('votes'));
@@ -789,8 +834,9 @@
      or interrupted wipe, so old drawings never sit in Firebase. */
   async function purgeStaleData(state){
     const stale = [];
-    const board = await dbGet(bp('board'));
-    Object.keys(board).forEach(k=>{ if(!isCurrentRound(board[k], state)) stale.push(bp('board/'+k)); });
+    /* Reuse what the board refresh already downloaded rather than pulling
+       every image again just to read its round tag. */
+    boardCache.forEach((rec, k)=>{ if(!isCurrentRound(rec, state)) stale.push(bp('board/'+k)); });
     const votes = await dbGet(bp('votes'));
     Object.keys(votes).forEach(k=>{ if(!isCurrentRound(votes[k], state)) stale.push(bp('votes/'+k)); });
     for(const path of stale){ await dbDelete(path); }
@@ -992,6 +1038,9 @@
   }
 
   let closedShown = false;
+  let lastVoteSignature = null;
+  let lastResultsSignature = null;
+  let lastHostSignature = null;
 
   function renderClosedScreen(){
     if(closedShown) return;
@@ -1027,6 +1076,7 @@
     if(state.phase !== drawLastPhase || roundChanged){
       drawLastPhase = state.phase;
       drawLastRound = state.round;
+      if(roundChanged) resetBoardCache();
       if(state.phase === 'drawing') renderDrawingPhase(state);
       else if(state.phase === 'voting') await renderVotingPhase(state);
       else if(state.phase === 'results') await renderResultsPhase(state);
@@ -1383,6 +1433,11 @@
     const submissions = await fetchBoard(state);
     const inner = document.getElementById('drawInner');
     if(!inner) return;
+
+    const sig = viewSignature(submissions, null, round + '|' + (myVote || ''));
+    if(sig === lastVoteSignature && document.getElementById('voteGrid')) return;
+    lastVoteSignature = sig;
+
     inner.innerHTML = `
       <div class="draw-wrap">
         <div class="panel">
@@ -1432,6 +1487,11 @@
     const topCount = ranked.length ? (counts[ranked[0].key]||0) : 0;
     const inner = document.getElementById('drawInner');
     if(!inner) return;
+
+    const sig = viewSignature(ranked, counts, state.round);
+    if(sig === lastResultsSignature && document.getElementById('resultsGrid')) return;
+    lastResultsSignature = sig;
+
     inner.innerHTML = `
       <div class="draw-wrap">
         <div class="panel"><div class="eyebrow">Results</div><h1>🏆 Top drawings</h1></div>
@@ -1636,6 +1696,7 @@
       btn.disabled = true; btn.textContent = 'Clearing…';
       await reopenSession();
       const clean = await wipeRoundData();
+      resetBoardCache(); lastHostSignature = null;
       const state = await getState();
       state.phase = 'drawing';
       state.timerEnd = null;
@@ -1650,6 +1711,7 @@
       const btn = document.getElementById('wipeBtn');
       btn.disabled = true; btn.textContent = 'Erasing…';
       const clean = await wipeRoundData();
+      resetBoardCache(); lastHostSignature = null;
       const fresh = { ...DEFAULT_STATE, round: 'r' + Date.now(), roundStartedAt: Date.now() };
       await setState(fresh);
       topicDirty = false; lastRemoteTopic = null;
@@ -1909,8 +1971,9 @@
       timerEl.textContent = '';
     }
 
-    await maybePurge(state);
+    /* Refresh first: the purge reads the cache that this populates. */
     await refreshHostBoard(state);
+    await maybePurge(state);
     setTimeout(hostPollLoop, POLL_MS);
   }
 
@@ -1922,6 +1985,7 @@
 
     if(submissions.length === 0){
       boardEl.innerHTML = ''; emptyEl.style.display = 'block'; countEl.textContent = '0 drawings';
+      lastHostSignature = 'empty';
       applyHiddenState();
       return;
     }
@@ -1938,6 +2002,11 @@
       }
     }
     const topCount = state.phase === 'results' && ordered.length ? (counts[ordered[0].key]||0) : -1;
+
+    const sig = viewSignature(ordered, counts, state.phase);
+    if(sig === lastHostSignature && boardEl.children.length){ applyHiddenState(); return; }
+    lastHostSignature = sig;
+
     const dotColors = ['#e5484d','#2f9e68','#5b5bd6','#f5a524','#3ba3a3','#c15a9e'];
 
     boardEl.innerHTML = ordered.map(item=>{
