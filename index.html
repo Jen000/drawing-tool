@@ -240,6 +240,41 @@
     font-size:12px;color:rgba(238,241,248,.55);display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   }
 
+  .sec-panel{padding:14px 18px;margin-bottom:22px;}
+  .sec-panel summary{
+    list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    font-size:13px;color:rgba(238,241,248,.75);
+  }
+  .sec-panel summary::-webkit-details-marker{display:none;}
+  .sec-chip{
+    display:inline-block;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);
+  }
+  .sec-chip:empty{display:none;}
+  .sec-chip.ok{background:rgba(99,214,156,.14);color:#7fe3ac;border-color:rgba(99,214,156,.3);}
+  .sec-chip.warn{background:rgba(245,165,36,.15);color:#f7c46c;border-color:rgba(245,165,36,.32);}
+  .sec-more{margin-left:auto;font-weight:600;color:rgba(238,241,248,.55);}
+  .sec-body{margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.1);}
+  .sec-lead{font-size:13.5px;line-height:1.6;color:rgba(238,241,248,.75);margin:0 0 12px;max-width:76ch;}
+  .sec-lead.sec-warn{color:#f7c46c;}
+  .sec-lead strong{color:#fff;}
+  .sec-steps{font-size:13.5px;line-height:1.8;color:rgba(238,241,248,.75);margin:0 0 14px;padding-left:20px;max-width:76ch;}
+  .sec-steps strong{color:#fff;}
+  .sec-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .sec-row .field{flex:1 1 240px;background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.14);color:#fff;font-size:14px;}
+  .sec-row .field::placeholder{color:rgba(238,241,248,.4);}
+  .sec-row .eyebrow{color:rgba(238,241,248,.6);}
+  .sec-uid{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+    background:rgba(255,255,255,.09);padding:6px 10px;border-radius:8px;word-break:break-all;
+  }
+  .sec-note{font-size:12px;color:rgba(238,241,248,.5);margin:0 0 14px;max-width:76ch;line-height:1.6;}
+  .sec-rules{
+    background:rgba(5,8,20,.5);border:1px solid rgba(255,255,255,.1);border-radius:12px;
+    padding:14px;font-size:11.5px;line-height:1.55;color:#c9d2e6;overflow-x:auto;margin:0;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;max-height:340px;overflow-y:auto;
+  }
+
   .board-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 4px 16px;}
   .board-header h1{font-size:22px;margin:0;}
   .board-header .count{font-size:13px;color:rgba(238,241,248,.6);}
@@ -285,8 +320,14 @@
   const params = new URLSearchParams(window.location.search);
   const isHost = params.get('host') === '1';
   const dbUrl = params.get('db');
+  const apiKey = params.get('key');          /* present => locked-down mode */
   const app = document.getElementById('app');
   const POLL_MS = 4000;
+
+  /* The host holds the door open in slices while the board is on screen, so an
+     old QR code is dead a short while after the presentation ends. */
+  const SESSION_WINDOW_MS = 30*60000;
+  const HEARTBEAT_MS = 5*60000;
 
   /* Fixed drawing resolution. The backing store is NEVER resized after creation,
      so an iOS URL-bar collapse or keyboard opening can't rescale (squash) artwork. */
@@ -320,31 +361,123 @@
     return Math.floor(s/60) + ':' + String(s % 60).padStart(2,'0');
   }
 
+  /* ---------- anonymous sign-in (Identity Toolkit REST, no SDK) ----------
+     Every guest silently gets a Firebase identity when they open the QR link.
+     It proves the write came from a real client of this project; the session
+     window below is what decides *when* those clients are allowed to write. */
+  const AUTH_ENABLED = !!apiKey;
+  const LS_KEY = 'drawTopicAuth:' + (apiKey || '');
+  const auth = { idToken:null, refreshToken:null, uid:null, expiresAt:0, error:null };
+
+  function storeAuth(){
+    try{ localStorage.setItem(LS_KEY, JSON.stringify({ refreshToken:auth.refreshToken, uid:auth.uid })); }catch(e){}
+  }
+  (function loadStoredAuth(){
+    if(!AUTH_ENABLED) return;
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      if(raw){ const o = JSON.parse(raw); auth.refreshToken = o.refreshToken || null; auth.uid = o.uid || null; }
+    }catch(e){}
+  })();
+
+  async function signInAnonymously(){
+    try{
+      const res = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(apiKey), {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ returnSecureToken:true })
+      });
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok){ auth.error = (data.error && data.error.message) || 'SIGN_IN_FAILED'; return false; }
+      auth.idToken = data.idToken; auth.refreshToken = data.refreshToken; auth.uid = data.localId;
+      auth.expiresAt = Date.now() + (parseInt(data.expiresIn,10) || 3600) * 1000;
+      auth.error = null; storeAuth(); return true;
+    }catch(e){ auth.error = 'NETWORK'; return false; }
+  }
+
+  async function refreshIdToken(){
+    if(!auth.refreshToken) return false;
+    try{
+      const res = await fetch('https://securetoken.googleapis.com/v1/token?key=' + encodeURIComponent(apiKey), {
+        method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body: new URLSearchParams({ grant_type:'refresh_token', refresh_token: auth.refreshToken })
+      });
+      const data = await res.json().catch(()=>({}));
+      if(!res.ok){ auth.refreshToken = null; return false; }
+      auth.idToken = data.id_token; auth.refreshToken = data.refresh_token; auth.uid = data.user_id;
+      auth.expiresAt = Date.now() + (parseInt(data.expires_in,10) || 3600) * 1000;
+      auth.error = null; storeAuth(); return true;
+    }catch(e){ return false; }
+  }
+
+  let authPromise = null;
+  async function getIdToken(){
+    if(!AUTH_ENABLED) return null;
+    if(auth.idToken && Date.now() < auth.expiresAt - 300000) return auth.idToken;
+    if(!authPromise){
+      /* Reuse the stored identity where possible so the host keeps the same
+         host ID across nights on this device. */
+      authPromise = (async ()=>{ if(!(await refreshIdToken())) await signInAnonymously(); })()
+        .finally(()=>{ authPromise = null; });
+    }
+    await authPromise;
+    return auth.idToken;
+  }
+
   /* ---------- Firebase Realtime Database storage layer ---------- */
-  function nodeUrl(path){ return dbUrl.replace(/\/$/, '') + '/' + path + '.json'; }
+  let readDenied = false;    /* rules refused the last read (session closed) */
+  let writeDenied = false;
+  let serverSkew = 0;        /* rules compare against server time, not ours */
+
+  function serverNow(){ return Date.now() + serverSkew; }
+  function noteServerTime(res){
+    const d = res.headers.get('date');
+    if(d){ const t = Date.parse(d); if(!isNaN(t)) serverSkew = t - Date.now(); }
+  }
+  function isDenied(res){ return res.status === 401 || res.status === 403; }
+
+  async function nodeUrl(path){
+    const base = dbUrl.replace(/\/$/, '') + '/' + path + '.json';
+    const token = await getIdToken();
+    return token ? base + '?auth=' + encodeURIComponent(token) : base;
+  }
 
   async function dbGet(path){
     try{
-      const res = await fetch(nodeUrl(path));
+      const res = await fetch(await nodeUrl(path));
+      noteServerTime(res);
+      if(isDenied(res)){ readDenied = true; return {}; }
+      readDenied = false;
       if(!res.ok) return {};
       const data = await res.json();
       return data || {};
     }catch(e){ return {}; }
   }
-  async function dbPatch(path, dataObj){
+  async function dbWrite(method, path, dataObj){
     try{
-      const res = await fetch(nodeUrl(path), { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj) });
+      const res = await fetch(await nodeUrl(path), {
+        method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj)
+      });
+      noteServerTime(res);
+      writeDenied = isDenied(res);
       return res.ok;
     }catch(e){ return false; }
   }
-  async function dbPut(path, dataObj){
-    try{
-      const res = await fetch(nodeUrl(path), { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(dataObj) });
-      return res.ok;
-    }catch(e){ return false; }
-  }
+  async function dbPatch(path, dataObj){ return dbWrite('PATCH', path, dataObj); }
+  async function dbPut(path, dataObj){ return dbWrite('PUT', path, dataObj); }
   async function dbDelete(path){
-    try{ const res = await fetch(nodeUrl(path), { method:'DELETE' }); return res.ok; }catch(e){ return false; }
+    try{
+      const res = await fetch(await nodeUrl(path), { method:'DELETE' });
+      noteServerTime(res);
+      writeDenied = isDenied(res);
+      return res.ok;
+    }catch(e){ return false; }
+  }
+
+  /* ---------- session window (host-controlled write gate) ---------- */
+  async function openSessionWindow(){ return dbPut('session/openUntil', serverNow() + SESSION_WINDOW_MS); }
+  async function closeSessionWindow(){ return dbPut('session/openUntil', 0); }
+  async function getSessionOpenUntil(){
+    const v = await dbGet('session/openUntil');
+    return typeof v === 'number' ? v : 0;
   }
 
   const DEFAULT_STATE = { topic: '', phase: 'drawing', timerEnd: null, round: 'r0', roundStartedAt: 0 };
@@ -355,7 +488,13 @@
   }
   async function setState(state){ return await dbPut('state', state); }
 
-  function getVoterId(){
+  /* Locked down, the vote key is the signed-in uid so the rules can enforce
+     one vote per person. Otherwise fall back to a per-tab random id. */
+  async function getVoterId(){
+    if(AUTH_ENABLED){
+      await getIdToken();
+      if(auth.uid) return auth.uid;
+    }
     let id = window.name && window.name.startsWith('voter:') ? window.name.slice(6) : null;
     if(!id){ id = 'v' + Math.random().toString(36).slice(2,10); window.name = 'voter:' + id; }
     return id;
@@ -432,7 +571,12 @@
           </ol>
           <label class="eyebrow" for="pantryInput">Firebase Database URL</label>
           <input id="pantryInput" class="field" style="margin-top:8px;" type="text" placeholder="https://yourproject-default-rtdb.firebaseio.com">
-          <div style="margin-top:16px;"><button class="btn" id="connectBtn">Connect</button></div>
+          <div style="margin-top:16px;">
+            <label class="eyebrow" for="apiKeySetup">Web API key <span style="text-transform:none;letter-spacing:0;font-weight:500;">— optional, locks the board down</span></label>
+            <input id="apiKeySetup" class="field" style="margin-top:8px;" type="text" placeholder="AIza… (leave blank to start in test mode)">
+            <p class="sub" style="margin:10px 0 0;font-size:13px;">With a key, guests are signed in anonymously behind the scenes and can only add drawings while your board is open — no login for them, and the link goes dead after your session. You can add this later from the board.</p>
+          </div>
+          <div style="margin-top:18px;"><button class="btn" id="connectBtn">Connect</button></div>
           <div class="err" id="setupErr"></div>
         </div>
       </div>
@@ -445,6 +589,8 @@
       const url = new URL(window.location.href);
       url.searchParams.set('db', val);
       url.searchParams.set('host', '1');
+      const key = document.getElementById('apiKeySetup').value.trim();
+      if(key) url.searchParams.set('key', key);
       window.location.href = url.toString();
     });
   }
@@ -457,8 +603,38 @@
     app.innerHTML = `<div id="drawInner"></div>`;
   }
 
+  let closedShown = false;
+
+  function renderClosedScreen(){
+    if(closedShown) return;
+    closedShown = true;
+    const inner = document.getElementById('drawInner');
+    if(!inner) return;
+    const why = auth.error === 'OPERATION_NOT_ALLOWED'
+      ? 'Anonymous sign-in is not switched on for this board yet — the host needs to enable it in Firebase.'
+      : 'The host has not opened this session yet, or it has already finished. Leave this page open — it will spring to life when the board goes up.';
+    inner.innerHTML = `
+      <div class="draw-wrap">
+        <div class="confirm">
+          <div class="stamp" style="background:linear-gradient(140deg,#5c6780,#8b95ad);box-shadow:none;">🔒</div>
+          <h2>This session is closed</h2>
+          <p>${esc(why)}</p>
+        </div>
+      </div>`;
+  }
+
   async function drawPollLoop(){
     const state = await getState();
+
+    /* Rules refuse reads outside the host's session window. */
+    if(readDenied){
+      renderClosedScreen();
+      drawLastPhase = null; drawLastRound = null;
+      setTimeout(drawPollLoop, POLL_MS);
+      return;
+    }
+    closedShown = false;
+
     const roundChanged = state.round !== drawLastRound;
     if(state.phase !== drawLastPhase || roundChanged){
       drawLastPhase = state.phase;
@@ -747,8 +923,14 @@
       const name = document.getElementById('nameInput').value.trim() || 'Anonymous';
       const latest = await getState();
       const key = 'd' + Date.now() + Math.random().toString(36).slice(2,8);
-      const ok = await dbPatch('board', { [key]: { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round } });
-      if(!ok){ btn.disabled = false; btn.textContent = 'Add'; showToast('Could not save — check your connection and try again.'); return; }
+      /* Written at its exact path so the rules validate this one drawing. */
+      const ok = await dbPut('board/' + key, { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round });
+      if(!ok){
+        btn.disabled = false; btn.textContent = 'Add';
+        showToast(writeDenied ? 'The host has closed this session — nothing can be added right now.'
+                              : 'Could not save — check your connection and try again.');
+        return;
+      }
       const inner2 = document.getElementById('drawInner');
       inner2.innerHTML = `
         <div class="draw-wrap">
@@ -795,9 +977,13 @@
       if(!myVote){
         btn.addEventListener('click', async ()=>{
           btn.disabled = true; btn.textContent = 'Saving…';
-          const voterId = getVoterId();
-          const ok = await dbPatch('votes', { [voterId]: { choice: item.key, ts: Date.now(), round } });
-          if(!ok){ showToast('Vote did not save — try again.'); btn.disabled = false; btn.textContent = 'Vote for this'; return; }
+          const voterId = await getVoterId();
+          const ok = await dbPut('votes/' + voterId, { choice: item.key, ts: Date.now(), round });
+          if(!ok){
+            showToast(writeDenied ? 'Voting is closed for this session.' : 'Vote did not save — try again.');
+            btn.disabled = false; btn.textContent = 'Vote for this';
+            return;
+          }
           setMyVote(round, item.key);
           renderVotingPhase(state);
         });
@@ -841,6 +1027,7 @@
   let lastRemoteTopic = null;
   let lastPurgedRound = null;
   let lastPurgeAt = 0;
+  let sessionHeldOpen = true;   /* false once the host closes the door by hand */
 
   /* Purging re-reads the board, so only do it when the round changes (right
      after a wipe) and as a slow background sweep after that. */
@@ -892,9 +1079,18 @@
             <div class="data-note">
               <span>🗑️ Drawings and votes are deleted from Firebase whenever you start a new round.</span>
               <button class="btn danger small" id="wipeBtn">Erase all data now</button>
+              <button class="btn danger small" id="closeSessionBtn" style="display:none;">Close session</button>
             </div>
           </div>
         </div>
+        <details class="glass sec-panel" id="secPanel">
+          <summary>
+            <span id="secMode" class="sec-chip">Checking…</span>
+            <span id="secSession" class="sec-chip"></span>
+            <span class="sec-more">Security &amp; access ▾</span>
+          </summary>
+          <div class="sec-body" id="secBody"></div>
+        </details>
         <div class="board-header">
           <h1>The board</h1>
           <div class="count" id="countText">0 drawings</div>
@@ -937,6 +1133,7 @@
 
     document.getElementById('startTimerBtn').addEventListener('click', async ()=>{
       const mins = Math.max(1, parseInt(document.getElementById('minutesInput').value, 10) || 3);
+      await reopenSession();
       const state = await getState();
       state.phase = 'drawing';
       state.timerEnd = Date.now() + mins*60000;
@@ -956,6 +1153,7 @@
       if(!confirm('Start a fresh round?\n\nEvery drawing and vote from this round is permanently deleted from Firebase.')) return;
       const btn = document.getElementById('newRoundBtn');
       btn.disabled = true; btn.textContent = 'Clearing…';
+      await reopenSession();
       const clean = await wipeRoundData();
       const state = await getState();
       state.phase = 'drawing';
@@ -986,11 +1184,168 @@
       }).catch(()=>{ showToast('Could not capture the board image — try a regular screenshot instead.'); });
     });
 
+    const closeBtn = document.getElementById('closeSessionBtn');
+    if(AUTH_ENABLED){
+      closeBtn.style.display = '';
+      closeBtn.addEventListener('click', async ()=>{
+        if(!confirm('Close this session?\n\nGuests will not be able to add drawings or vote until you reopen the board.')) return;
+        sessionHeldOpen = false;
+        const ok = await closeSessionWindow();
+        showToast(ok ? 'Session closed — the QR code no longer accepts drawings.' : 'Could not close the session — check your connection.');
+      });
+    }
+
+    renderSecurityPanel();
+    /* Hold the door open while the board is on screen; it lapses on its own
+       once the board is closed, so an old QR code goes dead by itself. */
+    await openSessionWindow();
+    setInterval(()=>{ if(sessionHeldOpen) openSessionWindow(); }, HEARTBEAT_MS);
+
     hostPollLoop();
   }
 
+  /* Starting a round or a timer means the host is running the board again. */
+  async function reopenSession(){
+    sessionHeldOpen = true;
+    await openSessionWindow();
+  }
+
+  const RULES_TEMPLATE = `{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "session": {
+      ".read": "auth != null",
+      ".write": "auth != null && auth.uid === '__HOST_UID__'"
+    },
+
+    "state": {
+      ".read": "auth != null && (auth.uid === '__HOST_UID__' || root.child('session/openUntil').val() > now)",
+      ".write": "auth != null && auth.uid === '__HOST_UID__'",
+      ".validate": "newData.hasChildren(['phase', 'round'])"
+    },
+
+    "board": {
+      ".read": "auth != null && (auth.uid === '__HOST_UID__' || root.child('session/openUntil').val() > now)",
+      ".write": "auth != null && auth.uid === '__HOST_UID__'",
+      "$drawing": {
+        ".write": "auth != null && !data.exists() && newData.exists() && root.child('session/openUntil').val() > now",
+        ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
+        "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
+        "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
+        "ts":      { ".validate": "newData.isNumber()" },
+        "round":   { ".validate": "newData.isString() && newData.val() === root.child('state/round').val()" },
+        "$other":  { ".validate": false }
+      }
+    },
+
+    "votes": {
+      ".read": "auth != null && (auth.uid === '__HOST_UID__' || root.child('session/openUntil').val() > now)",
+      ".write": "auth != null && auth.uid === '__HOST_UID__'",
+      "$voter": {
+        ".write": "auth != null && $voter === auth.uid && !data.exists() && newData.exists() && root.child('session/openUntil').val() > now",
+        ".validate": "newData.hasChildren(['choice', 'ts', 'round'])",
+        "choice": { ".validate": "newData.isString() && root.child('board').child(newData.val()).exists()" },
+        "ts":     { ".validate": "newData.isNumber()" },
+        "round":  { ".validate": "newData.isString() && newData.val() === root.child('state/round').val()" },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}`;
+
+  function rulesForHost(){ return RULES_TEMPLATE.replace(/__HOST_UID__/g, auth.uid || 'YOUR-HOST-ID'); }
+
+  async function renderSecurityPanel(){
+    const body = document.getElementById('secBody');
+    if(!body) return;
+    if(AUTH_ENABLED) await getIdToken();
+
+    if(!AUTH_ENABLED){
+      body.innerHTML = `
+        <p class="sec-lead">This board is running in <strong>test mode</strong>: anyone who has the database URL can read, add or delete drawings, at any time of day.</p>
+        <p class="sec-lead">To lock it down, guests sign in anonymously in the background and the rules only accept their drawings while this board is open. Nothing changes for them — no login, no prompt.</p>
+        <ol class="sec-steps">
+          <li>In Firebase: <strong>Build → Authentication → Get started → Anonymous → Enable</strong>.</li>
+          <li>In <strong>Project settings → General</strong>, copy the <strong>Web API key</strong> and paste it below.</li>
+          <li>Come back here and copy the database rules into <strong>Realtime Database → Rules</strong>.</li>
+        </ol>
+        <div class="sec-row">
+          <input id="apiKeyInput" class="field" type="text" placeholder="Web API key (AIza…)">
+          <button class="btn small" id="apiKeyBtn">Turn on locked-down mode</button>
+        </div>`;
+      document.getElementById('apiKeyBtn').addEventListener('click', ()=>{
+        const val = document.getElementById('apiKeyInput').value.trim();
+        if(!val){ showToast('Paste your Web API key first.'); return; }
+        const url = new URL(window.location.href);
+        url.searchParams.set('key', val);
+        window.location.href = url.toString();
+      });
+      return;
+    }
+
+    if(auth.error){
+      const msg = auth.error === 'OPERATION_NOT_ALLOWED'
+        ? 'Anonymous sign-in is not enabled yet. In Firebase go to <strong>Build → Authentication → Sign-in method → Anonymous → Enable</strong>, then reload this page.'
+        : 'Could not sign in to Firebase (' + esc(auth.error) + '). Check the Web API key in this page\'s address.';
+      body.innerHTML = `<p class="sec-lead sec-warn">${msg}</p>`;
+      return;
+    }
+
+    body.innerHTML = `
+      <p class="sec-lead">Guests are signed in anonymously and can only add drawings while this board is open. Paste the rules below into <strong>Realtime Database → Rules</strong> in Firebase, then hit Publish.</p>
+      <div class="sec-row">
+        <span class="eyebrow">Your host ID</span>
+        <code class="sec-uid" id="secUid">${esc(auth.uid || '')}</code>
+        <button class="btn secondary small" id="copyUidBtn">Copy</button>
+      </div>
+      <p class="sec-note">The rules below already have this ID baked in. It stays the same on this browser — if you host from a different device, copy the rules again from there.</p>
+      <div class="sec-row"><button class="btn small" id="copyRulesBtn">Copy database rules</button></div>
+      <pre class="sec-rules" id="secRules">${esc(rulesForHost())}</pre>`;
+
+    async function copy(text, btn, label){
+      try{ await navigator.clipboard.writeText(text); btn.textContent = 'Copied ✓'; }
+      catch(e){ showToast('Copy failed — select the text manually.'); return; }
+      setTimeout(()=>{ btn.textContent = label; }, 2000);
+    }
+    document.getElementById('copyUidBtn').addEventListener('click', (e)=> copy(auth.uid || '', e.target, 'Copy'));
+    document.getElementById('copyRulesBtn').addEventListener('click', (e)=> copy(rulesForHost(), e.target, 'Copy database rules'));
+  }
+
+  function updateSecurityChips(openUntil){
+    const mode = document.getElementById('secMode');
+    const sess = document.getElementById('secSession');
+    if(!mode || !sess) return;
+    if(!AUTH_ENABLED){
+      mode.textContent = '⚠️ Test mode — open to anyone';
+      mode.className = 'sec-chip warn';
+      sess.textContent = '';
+      return;
+    }
+    mode.textContent = auth.error ? '⚠️ Sign-in problem' : '🔒 Locked down';
+    mode.className = 'sec-chip ' + (auth.error ? 'warn' : 'ok');
+    const open = openUntil > serverNow();
+    sess.textContent = open ? 'Guests can draw · closes ' + new Date(openUntil).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : 'Session closed';
+    sess.className = 'sec-chip ' + (open ? 'ok' : '');
+  }
+
+  let hostDeniedWarned = false;
+
   async function hostPollLoop(){
     const state = await getState();
+
+    /* If the rules reject the host, the host ID in them is not this browser's. */
+    if(readDenied && !hostDeniedWarned){
+      hostDeniedWarned = true;
+      const panel = document.getElementById('secPanel');
+      if(panel) panel.open = true;
+      showToast('Firebase is refusing this board — check the rules use the host ID shown below.');
+    } else if(!readDenied){
+      hostDeniedWarned = false;
+    }
+
+    updateSecurityChips(await getSessionOpenUntil());
     const topicInput = document.getElementById('topicInput');
 
     /* Never clobber what the host is typing. Only sync the field when it is
