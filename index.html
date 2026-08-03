@@ -757,6 +757,7 @@
             <label class="eyebrow" for="apiKeySetup">Web API key <span style="text-transform:none;letter-spacing:0;font-weight:500;">— optional, locks the board down</span></label>
             <input id="apiKeySetup" class="field" style="margin-top:8px;" type="text" placeholder="AIza… (leave blank to start in test mode)">
             <p class="sub" style="margin:10px 0 0;font-size:13px;">With a key, guests are signed in anonymously behind the scenes and can only add drawings while your board is open — no login for them, and the link goes dead after your session. You can add this later from the board.</p>
+            <p class="sub" style="margin:8px 0 0;font-size:12.5px;">Find it in <strong>Project settings → General → Your apps</strong>. If there is no app listed, register a web app first (the <code>&lt;/&gt;</code> icon) — the key is the <code>apiKey</code> line in the config it shows you.</p>
           </div>
           <div style="margin-top:18px;"><button class="btn" id="connectBtn">Connect</button></div>
           <div class="err" id="setupErr"></div>
@@ -1727,7 +1728,8 @@
         <p class="sec-lead">Locking it down also unlocks host accounts and separate boards per presenter. Guests still just scan and draw — no login, no prompt.</p>
         <ol class="sec-steps">
           <li>In Firebase: <strong>Build → Authentication → Get started</strong>, then enable both <strong>Anonymous</strong> (for guests) and <strong>Email/Password</strong> (for hosts).</li>
-          <li>In <strong>Project settings → General</strong>, copy the <strong>Web API key</strong> and paste it below.</li>
+          <li>In <strong>Project settings → General → Your apps</strong>, click the web icon <code>&lt;/&gt;</code> to register a web app if you have not already (any nickname, skip Hosting). Firebase then shows a config snippet.</li>
+          <li>Copy the <code>apiKey</code> value from that snippet — it starts with <code>AIza</code> — and paste it below. It is safe to share; your database rules do the protecting.</li>
           <li>Come back here and copy the database rules into <strong>Realtime Database → Rules</strong>.</li>
         </ol>
         <div class="sec-row">

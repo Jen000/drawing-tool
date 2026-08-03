@@ -27,7 +27,12 @@ what lets several presenters share one deployment.
 
 1. Firebase → **Build → Authentication → Get started**, and enable **both**
    sign-in providers: **Anonymous** (guests) and **Email/Password** (hosts).
-2. Firebase → **Project settings → General** → copy the **Web API key**.
+2. Firebase → **Project settings → General → Your apps**. If there is no app
+   yet, click the web icon `</>`, give it any nickname and skip Hosting —
+   until a web app is registered there is no Web API key to copy. Firebase then
+   shows a `firebaseConfig` snippet; the key is the `apiKey` value, starting
+   with `AIza`. (It also appears as **Web API Key** on that page once an app
+   exists, and in Google Cloud Console → APIs & Services → Credentials.)
 3. Open the board with `?host=1&db=…`, expand **Security & access**, paste the
    key, and press *Turn on locked-down mode*. The URL gains a `&key=…`
    parameter — use that URL from now on.
