@@ -239,6 +239,14 @@
     padding:1px 7px;border-radius:6px;letter-spacing:.06em;margin-right:8px;
   }
 
+  .allowance-bar{
+    border-radius:12px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:14px;
+    background:rgba(245,165,36,.15);color:#8a5c0f;border:1px solid rgba(245,165,36,.35);
+  }
+  .allowance-bar.bad{background:rgba(229,72,77,.12);color:var(--danger);border-color:rgba(229,72,77,.35);}
+  .host-wrap .allowance-bar{background:rgba(245,165,36,.16);color:#f7c46c;border-color:rgba(245,165,36,.32);}
+  .host-wrap .allowance-bar.bad{background:rgba(229,72,77,.16);color:#ff9b97;border-color:rgba(229,72,77,.35);}
+  .allowance-summary{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;}
   .access-id{
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;
     background:var(--surface-2);border:1px solid var(--line);padding:8px 12px;
@@ -789,6 +797,9 @@
     }catch(e){ return false; }
   }
   async function dbPatch(path, dataObj){ return dbWrite('PATCH', path, dataObj); }
+  /* One write, several paths. The rules require a quota counter to move in the
+     same update as the thing it counts, which is only possible atomically. */
+  async function dbUpdate(paths){ return dbWrite('PATCH', '', paths); }
   async function dbPut(path, dataObj){ return dbWrite('PUT', path, dataObj); }
   async function dbDelete(path){
     try{
@@ -805,6 +816,49 @@
   async function getSessionOpenUntil(){
     const v = await dbGet(bp('session/openUntil'));
     return typeof v === 'number' ? v : 0;
+  }
+
+  /* ---------- allowance ----------
+     Unlimited accounts are listed under /hosts. Everyone else claims a code,
+     which grants a week and a fixed number of boards and drawings. Counters
+     live in the data because rules cannot count. */
+  const WEEK_MS = 7*24*60*60*1000;
+  let myGrant = null;           /* null = none, or the grant object */
+  let iAmUnlimited = false;
+
+  async function loadAllowance(){
+    if(!auth.uid){ myGrant = null; iAmUnlimited = false; return; }
+    const [unlimited, grant] = await Promise.all([
+      dbGet('hosts/' + auth.uid),
+      dbGet('grants/' + auth.uid)
+    ]);
+    iAmUnlimited = unlimited === true;
+    myGrant = (grant && grant.expiresAt) ? grant : null;
+    return myGrant;
+  }
+  function grantLive(g){ return !!(g && g.expiresAt > serverNow()); }
+  function boardsLeft(g){ return g ? Math.max(0, (g.boardsMax || 0) - (g.boardsUsed || 0)) : 0; }
+  function imagesLeft(g){ return g ? Math.max(0, (g.imagesMax || 0) - (g.imagesUsed || 0)) : 0; }
+  function daysLeft(g){ return g ? Math.max(0, Math.ceil((g.expiresAt - serverNow()) / 86400000)) : 0; }
+
+  /* Claim a code: take the code and create the allowance in one write, so a
+     grant can never exist without a code behind it. */
+  async function claimCode(rawCode){
+    const code = String(rawCode || '').trim().toUpperCase();
+    if(!code) return { ok:false, reason:'empty' };
+    const now = serverNow();
+    const ok = await dbUpdate({
+      ['codes/' + code + '/claimedBy']: auth.uid,
+      ['codes/' + code + '/claimedAt']: now,
+      ['grants/' + auth.uid]: {
+        code, expiresAt: now + WEEK_MS,
+        boardsUsed: 0, boardsMax: 6,
+        imagesUsed: 0, imagesMax: 90
+      }
+    });
+    if(!ok) return { ok:false, reason:'refused' };
+    await loadAllowance();
+    return { ok:true };
   }
 
   /* ---------- boards: one per presenter, so several people can run their own
@@ -841,7 +895,15 @@
       const candidate = newBoardCode();
       const existing = await dbGet('boards/' + candidate + '/owner');
       if(existing && typeof existing === 'string') continue;
-      if(await dbPut('boards/' + candidate + '/owner', auth.uid)){ id = candidate; break; }
+      /* Claiming the code and spending one of the allowance's boards have to
+         happen together, or neither happens. */
+      const claim = { ['boards/' + candidate + '/owner']: auth.uid };
+      if(!iAmUnlimited && myGrant) claim['grants/' + auth.uid + '/boardsUsed'] = (myGrant.boardsUsed || 0) + 1;
+      if(await dbUpdate(claim)){
+        id = candidate;
+        if(claim['grants/' + auth.uid + '/boardsUsed'] !== undefined) myGrant.boardsUsed = (myGrant.boardsUsed || 0) + 1;
+        break;
+      }
     }
     if(!id) return null;
     await dbPut('boards/' + id + '/meta', { name: clean, createdAt });
@@ -1328,6 +1390,8 @@
               <button class="btn ghost small" id="signOutBtn">Sign out</button>
             </div>
           </div>
+          <div class="allowance-bar" id="allowanceBar" style="display:none;"></div>
+          <div class="allowance-summary" id="allowanceSummary"></div>
           <div id="boardList" class="board-list"><p class="sub">Loading…</p></div>
           <p class="picker-note">Your boards follow your account, so you can sign in from any laptop and they will be here.</p>
           <div class="picker-row">
@@ -1344,6 +1408,10 @@
       url.searchParams.delete('b');
       window.location.href = url.toString();
     });
+
+    paintAllowanceBanner();
+    const sumEl = document.getElementById('allowanceSummary');
+    if(sumEl) sumEl.textContent = allowanceSummary();
 
     async function paintList(){
       const listEl = document.getElementById('boardList');
@@ -1386,10 +1454,15 @@
     document.getElementById('createBoardBtn').addEventListener('click', async ()=>{
       const btn = document.getElementById('createBoardBtn');
       btn.disabled = true; btn.textContent = 'Creating…';
+      if(!iAmUnlimited && myGrant && boardsLeft(myGrant) <= 0){
+        btn.disabled = false; btn.textContent = 'Create board';
+        showToast('That is all six boards for this week. Delete one, or start a new week.');
+        return;
+      }
       const id = await createBoard(document.getElementById('newBoardName').value);
       if(!id){
         btn.disabled = false; btn.textContent = 'Create board';
-        if(writeDenied){ renderAccessNeeded(); return; }
+        if(writeDenied){ renderClaimScreen(); return; }
         showToast('Could not create the board — check the database rules are published.');
         return;
       }
@@ -1400,28 +1473,44 @@
   /* Owners can restrict who may host by adding uids under /hosts. When that is
      on, a stranger's first board creation is refused — say so plainly and give
      them the one thing the owner needs, rather than a generic failure. */
-  function renderAccessNeeded(){
+  /* Someone with no allowance: let them redeem a week code, ask the owner for
+     unlimited, or go and run their own copy. */
+  function renderClaimScreen(opts){
     const uid = auth.uid || '';
+    const expired = !!(opts && opts.expired);
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card">
-          <h2>Almost there</h2>
-          <p class="sub">This copy is invite-only, so hosting has to be switched on for your account. Playing is unaffected — anyone with a code can still join a board.</p>
+          <h2>${expired ? 'Your week is up' : 'Almost there'}</h2>
+          <p class="sub">${expired
+            ? 'Boards you made are paused until you start another week. Nothing was deleted.'
+            : 'This copy needs an access code before you can run boards. Playing is unaffected — anyone with a board code can still join.'}</p>
 
           <div class="landing-block" style="margin-top:18px;">
-            <div class="landing-label">Send the owner this ID</div>
-            <p class="landing-hint">It is just an account identifier — it carries nothing personal.</p>
+            <div class="landing-label">Have a code?</div>
+            <p class="landing-hint">A week of hosting: 6 boards and 90 drawings.</p>
+            <input id="accessCode" class="field join-input" type="text" inputmode="latin"
+                   autocapitalize="characters" autocomplete="off" spellcheck="false"
+                   maxlength="9" placeholder="ABCD-2345" aria-label="Access code"
+                   style="font-size:22px;letter-spacing:.14em;">
+            <div class="err" id="claimErr"></div>
+            <button class="btn landing-go" id="claimBtn">Start my week</button>
+          </div>
+
+          <div class="landing-split"><span>or</span></div>
+
+          <div class="landing-block">
+            <div class="landing-label">Ask for unlimited access</div>
+            <p class="landing-hint">Send the owner this ID. It is just an account identifier.</p>
             <div class="sec-row">
               <code class="access-id" id="accessId">${esc(uid)}</code>
               <button class="btn secondary small" id="copyAccessId">Copy</button>
             </div>
           </div>
 
-          <div class="landing-split"><span>or</span></div>
-
-          <div class="landing-block">
-            <div class="landing-label">Run your own copy</div>
-            <p class="landing-hint">The game is one file and a free database. Then it is your backend, with no waiting on anyone.</p>
+          <div class="landing-block" style="margin-top:18px;">
+            <div class="landing-label">Or run your own copy</div>
+            <p class="landing-hint">Your own free database, no limits, no waiting on anyone.</p>
             ${BUILT_IN.docsUrl
               ? `<a class="btn secondary landing-go" href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">Read the setup guide</a>`
               : `<p class="landing-hint" style="margin:0;">See <code>docs/setup.md</code> in the project.</p>`}
@@ -1434,6 +1523,27 @@
         </div>
       </div>`;
 
+    const codeEl = document.getElementById('accessCode');
+    const errEl = document.getElementById('claimErr');
+    codeEl.addEventListener('input', ()=>{
+      codeEl.value = codeEl.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      errEl.textContent = '';
+    });
+    async function claim(){
+      const btn = document.getElementById('claimBtn');
+      btn.disabled = true; btn.textContent = '…';
+      const res = await claimCode(codeEl.value);
+      if(!res.ok){
+        errEl.textContent = res.reason === 'empty'
+          ? 'Enter the code you were given.'
+          : 'That code is not valid, or somebody has already used it.';
+        btn.disabled = false; btn.textContent = 'Start my week';
+        return;
+      }
+      startHost();
+    }
+    document.getElementById('claimBtn').addEventListener('click', claim);
+    codeEl.addEventListener('keydown', e=>{ if(e.key === 'Enter') claim(); });
     document.getElementById('copyAccessId').addEventListener('click', async (e)=>{
       try{
         await navigator.clipboard.writeText(uid);
@@ -1441,7 +1551,7 @@
         setTimeout(()=>{ e.target.textContent = 'Copy'; }, 2000);
       }catch(err){ showToast('Copy failed — select the ID and copy it by hand.'); }
     });
-    document.getElementById('accessRetry').addEventListener('click', ()=> renderBoardPicker());
+    document.getElementById('accessRetry').addEventListener('click', async ()=>{ await loadAllowance(); startHost(); });
     document.getElementById('accessSignOut').addEventListener('click', ()=>{
       clearAuth();
       const url = new URL(window.location.href);
@@ -1455,8 +1565,46 @@
     if(!AUTH_ENABLED){ renderHostView(); return; }
     await getIdToken();
     if(!isSignedInHost()){ renderHostAuth(); return; }
+
+    await loadAllowance();
+    /* No allowance at all is only a wall where one is being enforced; an
+       unrestricted deployment has neither hosts nor codes and never gets here. */
+    if(!iAmUnlimited && myGrant && !grantLive(myGrant)){ renderClaimScreen({ expired:true }); return; }
+
     if(!boardId){ renderBoardPicker(); return; }
     renderHostView();
+  }
+
+  /* The warnings: a week that lapses mid-event, or an allowance that runs out
+     with the room waiting, should never be the first you hear of it. */
+  function allowanceNotice(){
+    if(iAmUnlimited || !myGrant) return null;
+    const days = daysLeft(myGrant), boards = boardsLeft(myGrant), images = imagesLeft(myGrant);
+    if(!grantLive(myGrant)) return { level:'bad', text:'Your week has ended — start another to use your boards again.' };
+    const parts = [];
+    if(days <= 2) parts.push(days <= 1 ? 'ends today' : days + ' days left');
+    if(images <= 15) parts.push(images + ' drawing' + (images === 1 ? '' : 's') + ' left');
+    if(boards <= 1) parts.push(boards === 0 ? 'no boards left' : '1 board left');
+    if(!parts.length) return null;
+    return {
+      level: (days <= 1 || images <= 5 || boards === 0) ? 'bad' : 'warn',
+      text: 'Your week: ' + parts.join(' · ')
+    };
+  }
+  function allowanceSummary(){
+    if(iAmUnlimited) return 'Unlimited access';
+    if(!myGrant) return '';
+    return `${daysLeft(myGrant)}d left · ${boardsLeft(myGrant)}/${myGrant.boardsMax} boards · ${imagesLeft(myGrant)}/${myGrant.imagesMax} drawings`;
+  }
+  function paintAllowanceBanner(){
+    const host = document.getElementById('allowanceBar');
+    if(!host) return;
+    const n = allowanceNotice();
+    host.style.display = n ? '' : 'none';
+    if(n){
+      host.textContent = n.text;
+      host.className = 'allowance-bar ' + n.level;
+    }
   }
 
   /* ================= DRAW VIEW (participant) ================= */
@@ -2028,10 +2176,21 @@
          the rules refuse any overwrite, and a new round clears the board. */
       const key = (AUTH_ENABLED && auth.uid) ? auth.uid : ('d' + Date.now() + Math.random().toString(36).slice(2,8));
       /* Written at its exact path so the rules validate this one drawing. */
-      const ok = await dbPut(bp('board/' + key), { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round });
+      const entry = { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round };
+      let ok;
+      if(boardId){
+        /* The drawing and the owner's counter move together, or not at all. */
+        const owner = await dbGet(bp('owner'));
+        const ownerGrant = (typeof owner === 'string') ? await dbGet('grants/' + owner + '/imagesUsed') : null;
+        const update = { ['boards/' + boardId + '/board/' + key]: entry };
+        if(typeof ownerGrant === 'number') update['grants/' + owner + '/imagesUsed'] = ownerGrant + 1;
+        ok = await dbUpdate(update);
+      } else {
+        ok = await dbPut(bp('board/' + key), entry);
+      }
       if(!ok){
         btn.disabled = false; btn.textContent = 'Add';
-        showToast(writeDenied ? 'The host has closed this session — nothing can be added right now.'
+        showToast(writeDenied ? 'This board is not accepting drawings right now — check with the host.'
                               : 'Could not save — check your connection and try again.');
         return;
       }
@@ -2254,6 +2413,7 @@
           </summary>
           <div class="sec-body" id="secBody"></div>
         </details>
+        <div class="allowance-bar" id="allowanceBar" style="display:none;"></div>
         <div class="board-header">
           <div class="board-title-wrap">
             <h1 id="boardTitle">The board</h1>
@@ -2509,66 +2669,136 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "hosts": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid"
       }
     },
-
+    "codes": {
+      "$code": {
+        ".write": "auth != null && data.exists() && !data.child('claimedBy').exists() && newData.child('claimedBy').val() === auth.uid",
+        "claimedBy": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "claimedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "mintedAt": {
+          ".validate": "newData.isNumber() && newData.val() === data.val()"
+        },
+        "note": {
+          ".validate": "newData.isString()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "grants": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && (!data.exists() || data.child('expiresAt').val() < now)",
+        ".validate": "newData.hasChildren(['code','expiresAt','boardsUsed','boardsMax','imagesUsed','imagesMax'])",
+        "code": {
+          ".validate": "newData.isString() && newData.parent().parent().parent().child('codes').child(newData.val()).child('claimedBy').val() === auth.uid"
+        },
+        "expiresAt": {
+          ".validate": "newData.isNumber() && newData.val() > now && newData.val() <= now + 604800000"
+        },
+        "boardsMax": {
+          ".validate": "newData.isNumber() && newData.val() === 6"
+        },
+        "imagesMax": {
+          ".validate": "newData.isNumber() && newData.val() === 90"
+        },
+        "boardsUsed": {
+          ".write": "auth != null && auth.uid === $uid && data.exists() && newData.val() === data.val() + 1",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= data.parent().child('boardsMax').val()"
+        },
+        "imagesUsed": {
+          ".read": "auth != null",
+          ".write": "auth != null && data.exists() && newData.val() === data.val() + 1",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= data.parent().child('imagesMax').val()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
       }
     },
-
     "boards": {
       "$b": {
-        ".read": "auth != null && (root.child('boards').child($b).child('owner').val() === auth.uid || root.child('boards').child($b).child('session/openUntil').val() > now)",
-        ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid",
-
+        ".read": "auth != null && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(root.child('boards').child($b).child('owner').val()).exists() || root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('expiresAt').val() > now) && (root.child('boards').child($b).child('owner').val() === auth.uid || root.child('boards').child($b).child('session/openUntil').val() > now)",
+        ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(root.child('boards').child($b).child('owner').val()).exists() || root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('expiresAt').val() > now)",
         "owner": {
-          ".write": "auth != null && !data.exists() && newData.val() === auth.uid && (!root.child('hosts').exists() || root.child('hosts').child(auth.uid).exists())",
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(auth.uid).exists() || (root.child('grants').child(auth.uid).child('expiresAt').val() > now && newData.parent().parent().parent().child('grants').child(auth.uid).child('boardsUsed').val() === root.child('grants').child(auth.uid).child('boardsUsed').val() + 1))",
           ".validate": "newData.isString()"
         },
-
         "meta": {
           ".validate": "newData.hasChildren(['name'])",
-          "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
-          "createdAt": { ".validate": "newData.isNumber()" },
-          "$other":    { ".validate": false }
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
         },
-
         "session": {
-          "openUntil": { ".validate": "newData.isNumber()" },
-          "$other":    { ".validate": false }
+          "openUntil": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
         },
-
         "state": {
           ".validate": "newData.hasChildren(['phase', 'round'])"
         },
-
         "board": {
-              "$drawing": {
-            ".write": "auth != null && $drawing === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+          "$drawing": {
+            ".write": "auth != null && $drawing === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(root.child('boards').child($b).child('owner').val()).exists() || (root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('expiresAt').val() > now && newData.parent().parent().parent().parent().child('grants').child(root.child('boards').child($b).child('owner').val()).child('imagesUsed').val() === root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('imagesUsed').val() + 1))",
             ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
-            "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
-            "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
-            "ts":      { ".validate": "newData.isNumber()" },
-            "round":   { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
-            "$other":  { ".validate": false }
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 24"
+            },
+            "dataUrl": {
+              ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')"
+            },
+            "ts": {
+              ".validate": "newData.isNumber()"
+            },
+            "round": {
+              ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         },
-
         "votes": {
           "$voter": {
             ".write": "auth != null && $voter === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
             ".validate": "newData.hasChildren(['choice', 'ts', 'round'])",
-            "choice": { ".validate": "newData.isString() && root.child('boards').child($b).child('board').child(newData.val()).exists()" },
-            "ts":     { ".validate": "newData.isNumber()" },
-            "round":  { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
-            "$other": { ".validate": false }
+            "choice": {
+              ".validate": "newData.isString() && root.child('boards').child($b).child('board').child(newData.val()).exists()"
+            },
+            "ts": {
+              ".validate": "newData.isNumber()"
+            },
+            "round": {
+              ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         }
       }
@@ -2668,6 +2898,7 @@
     }
 
     updateSecurityChips(await getSessionOpenUntil());
+    if(AUTH_ENABLED && isSignedInHost() && !iAmUnlimited){ await loadAllowance(); paintAllowanceBanner(); }
     const topicInput = document.getElementById('topicInput');
 
     /* Never clobber what the host is typing. Only sync the field when it is

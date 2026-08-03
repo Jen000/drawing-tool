@@ -1,15 +1,15 @@
-# Trial access — agreed design
+# Trial access
 
-Notes for building the week-code tier. Nothing here is implemented yet except
-the unlimited tier and the one-entry-per-round rule, both of which are live.
+Letting people run games on your database without setting up their own, without
+handing them your whole allowance.
 
 ## The three tiers
 
 | Tier | Who | What they get |
 |---|---|---|
-| **Unlimited** | accounts listed under `/hosts` | everything, no limits — *built* |
-| **Trial** | anyone who claims a week code | 1 week, 6 boards, 90 drawings — *to build* |
-| **Own backend** | anyone | unlimited, on their own Firebase — *works today via `?db=&key=`, wants a settings screen* |
+| **Unlimited** | accounts listed under `/hosts` | everything, no limits |
+| **Trial** | anyone who claims a week code | 1 week, 6 boards, 90 drawings |
+| **Own backend** | anyone | unlimited, on their own Firebase, via `?db=&key=` |
 
 ## Decisions taken
 
@@ -69,12 +69,26 @@ identically, so the pool cannot be enumerated.
   is roughly 1 MB stored and a few MB transferred, so the free tier absorbs a
   lot of trials — but it is your quota they spend.
 
+## Running it
+
+Mint codes with `node tools/mint-codes.mjs 10`, and paste the JSON into
+**Realtime Database → Data → /codes → Import JSON**. How many are unclaimed is
+how many trials are available; when they run out, nobody new can start one until
+you mint again.
+
+To give somebody unlimited access instead, add their account ID under `/hosts`.
+They can find it on the screen they are shown when hosting is refused.
+
+A claimed code shows who took it and when, so you can see where they went.
+
+## Warnings
+
+A host is told when their week is nearly up, when drawings are running low, and
+when boards are running out — on the board and in the board list, so a week
+never lapses mid-event without notice. Running out of boards says so plainly
+rather than failing silently.
+
 ## Still to build
 
-1. Rules for `codes` and `grants`, and the expiry gate on `boards`.
-2. Claiming a code during sign-up, and again to start a new week.
-3. A quota panel: days left, boards left, drawings left, with a warning as the
-   week runs down.
-4. A settings screen for pasting your own Firebase details, replacing the
-   current `?db=&key=` URL parameters.
-5. Docs for both audiences.
+A settings screen for pasting your own Firebase details, replacing the current
+`?db=&key=` URL parameters.
