@@ -89,6 +89,10 @@ the second.
 
 When the timer runs out, voting opens on its own.
 
+> **One drawing each per round.** Everyone gets a single entry, so nobody can
+> flood the board and the vote stays fair. A new round gives everyone a fresh
+> go.
+
 ### 7. Vote
 
 **Open voting** puts everyone's drawings on their phones. One vote each, and

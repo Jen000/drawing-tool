@@ -43,8 +43,8 @@
         },
 
         "board": {
-          "$drawing": {
-            ".write": "auth != null && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+              "$drawing": {
+            ".write": "auth != null && $drawing === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
             ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
             "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
             "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },

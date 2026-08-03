@@ -21,6 +21,10 @@ You want to run your own copy with your own database, so you are not depending
 on anyone else's. Firebase setup, security rules, configuration and hosting.
 Assumes you can copy and paste, not that you can code.
 
+**[Trial access →](docs/trial-access.md)**
+The design for letting people try it on your database without setting up their
+own: week codes, limits, and what is built so far.
+
 **[How it works →](docs/how-it-works.md)**
 What the code is doing and why: the data model, security rules, what is stored
 and for how long, and the decisions behind them.

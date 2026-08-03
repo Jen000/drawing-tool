@@ -2024,7 +2024,9 @@
       /* Keep a full-resolution copy for them before the canvas goes away. */
       const keepsake = canvas.toDataURL('image/png');
       const latest = await getState();
-      const key = 'd' + Date.now() + Math.random().toString(36).slice(2,8);
+      /* Keyed by the person, so everyone gets exactly one entry per round —
+         the rules refuse any overwrite, and a new round clears the board. */
+      const key = (AUTH_ENABLED && auth.uid) ? auth.uid : ('d' + Date.now() + Math.random().toString(36).slice(2,8));
       /* Written at its exact path so the rules validate this one drawing. */
       const ok = await dbPut(bp('board/' + key), { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round });
       if(!ok){
@@ -2039,14 +2041,15 @@
           <div class="confirm">
             <div class="stamp">✓</div>
             <h2>Added to the board!</h2>
-            <p>Your drawing just showed up on the big screen.</p>
+            <p>Your drawing just showed up on the big screen.${AUTH_ENABLED ? ' One each per round — you are in.' : ''}</p>
             <div class="confirm-actions">
-              <button class="btn" id="drawAgain">Draw another</button>
+              ${AUTH_ENABLED ? '' : '<button class="btn" id="drawAgain">Draw another</button>'}
               <button class="btn secondary" id="saveMine">Save my drawing</button>
             </div>
           </div>
         </div>`;
-      document.getElementById('drawAgain').addEventListener('click', ()=> renderDrawingPhase(state));
+      const againBtn = document.getElementById('drawAgain');
+      if(againBtn) againBtn.addEventListener('click', ()=> renderDrawingPhase(state));
       document.getElementById('saveMine').addEventListener('click', ()=>{
         downloadDataUrl(keepsake, 'my-drawing-' + (safeFilePart(name) || 'anon') + '.png');
       });
@@ -2547,8 +2550,8 @@
         },
 
         "board": {
-          "$drawing": {
-            ".write": "auth != null && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+              "$drawing": {
+            ".write": "auth != null && $drawing === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
             ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
             "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
             "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
