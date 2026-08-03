@@ -350,6 +350,81 @@
   }
   .empty-state{color:rgba(238,241,248,.6);text-align:center;padding:64px 20px;font-size:15px;}
 
+  /* ---- the shared screen: read from across a room ---- */
+  .screen-overlay{position:fixed;inset:0;z-index:900;}
+  .screen-wrap{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    padding:clamp(16px,2.4vw,36px);gap:clamp(10px,1.6vh,22px);color:#eef1f8;
+    background:
+      radial-gradient(1100px 700px at 12% -8%, rgba(124,108,240,.34), transparent 60%),
+      radial-gradient(900px 600px at 96% 6%, rgba(59,163,163,.22), transparent 55%),
+      linear-gradient(165deg,#131a2e 0%,#151327 55%,#0d1120 100%);
+  }
+  .screen-head{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex:0 0 auto;}
+  .screen-topic-wrap{min-width:0;}
+  .screen-eyebrow{
+    font-size:clamp(11px,1.1vw,15px);letter-spacing:.14em;text-transform:uppercase;
+    color:rgba(238,241,248,.55);font-weight:700;
+  }
+  .screen-topic{
+    font-size:clamp(28px,4.6vw,68px);line-height:1.08;margin:6px 0 0;
+    text-shadow:0 2px 20px rgba(0,0,0,.35);
+  }
+  .screen-meta{text-align:right;flex:0 0 auto;}
+  .screen-timer{
+    font-family:'Space Grotesk','Inter',sans-serif;font-variant-numeric:tabular-nums;
+    font-size:clamp(34px,5.4vw,84px);font-weight:700;line-height:1;
+  }
+  .screen-timer.low{color:#ff8b87;}
+  .screen-count{font-size:clamp(12px,1.2vw,17px);color:rgba(238,241,248,.55);margin-top:6px;}
+
+  .screen-body{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .screen-grid{
+    display:grid;gap:clamp(10px,1.4vw,22px);
+    align-content:center;justify-content:center;
+  }
+  .screen-card{
+    position:relative;background:#fff;border-radius:14px;padding:clamp(5px,.6vw,10px);
+    box-shadow:0 14px 34px rgba(5,8,20,.45);
+  }
+  .screen-card img{width:100%;aspect-ratio:1/1;object-fit:contain;display:block;border-radius:9px;background:#fff;transition:filter .35s ease;}
+  .screen-card.winner{box-shadow:0 0 0 4px var(--warn), 0 18px 40px rgba(5,8,20,.5);}
+  /* inside the card — a projector crops anything hanging over the edge */
+  .screen-crown{position:absolute;top:clamp(6px,.8vw,14px);left:clamp(10px,1vw,16px);font-size:clamp(20px,2.2vw,36px);line-height:1;}
+  .screen-name{
+    text-align:center;color:var(--ink-soft);font-weight:600;
+    font-size:clamp(10px,1.05vw,16px);margin-top:5px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .screen-votes{
+    position:absolute;top:clamp(10px,1vw,16px);right:clamp(10px,1vw,16px);
+    background:rgba(15,23,41,.82);color:#fff;border-radius:999px;backdrop-filter:blur(6px);
+    font-size:clamp(12px,1.3vw,20px);font-weight:700;padding:2px clamp(8px,.8vw,13px);
+  }
+  .screen-grid.drawings-hidden .screen-card img{filter:blur(30px);}
+  .screen-grid.drawings-hidden .screen-name{visibility:hidden;}
+  .screen-empty{color:rgba(238,241,248,.5);font-size:clamp(14px,1.6vw,24px);}
+
+  .screen-join{
+    flex:0 0 auto;display:flex;align-items:center;gap:clamp(12px,1.6vw,26px);
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.11);
+    border-radius:18px;padding:clamp(10px,1.2vw,18px);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  }
+  .screen-qr{background:#fff;padding:8px;border-radius:12px;line-height:0;font-size:10px;color:#0f1729;word-break:break-all;max-width:220px;}
+  .screen-qr img,.screen-qr canvas{display:block;}
+  .screen-join-lead{font-size:clamp(11px,1.1vw,15px);letter-spacing:.12em;text-transform:uppercase;color:rgba(238,241,248,.55);font-weight:700;}
+  .screen-join-where{font-size:clamp(15px,1.9vw,30px);font-weight:600;margin:4px 0 2px;word-break:break-all;}
+  .screen-join-code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;
+    font-size:clamp(26px,4vw,60px);letter-spacing:.16em;line-height:1.1;
+  }
+  .screen-exit{
+    position:fixed;bottom:16px;right:16px;opacity:.25;transition:opacity .2s ease;z-index:2;
+    background:rgba(255,255,255,.12);color:#eef1f8;border:1px solid rgba(255,255,255,.2);
+  }
+  .screen-exit:hover{opacity:1;}
+
   .toast{
     position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
     background:#0f1729;color:#fff;padding:12px 18px;border-radius:12px;font-size:13px;
@@ -882,6 +957,183 @@
       if(key) url.searchParams.set('key', key);
       window.location.href = url.toString();
     });
+  }
+
+  /* ================= SHARED SCREEN (the view the room sees) =================
+     Everything here is audience-facing: topic, timer, how to join, the drawings
+     and the result. No topic box, no phase buttons, no account, no rules — the
+     host keeps those on their own screen. Used two ways: as a full-screen
+     overlay on the presenting machine, and as its own URL (&screen=1) for a
+     second display. */
+
+  function paintQr(el, text, size){
+    if(!el) return true;
+    if(typeof QRCode === 'undefined'){ el.textContent = text; return false; }
+    try{
+      el.textContent = '';
+      new QRCode(el, { text, width:size, height:size, colorDark:'#0f1729', colorLight:'#ffffff' });
+      return true;
+    }catch(e){ el.textContent = text; return false; }
+  }
+
+  function screenShellMarkup(withExit){
+    return `
+      <div class="screen-wrap" id="screenWrap">
+        <div class="screen-head">
+          <div class="screen-topic-wrap">
+            <span class="screen-eyebrow" id="screenEyebrow">Topic</span>
+            <h1 class="screen-topic" id="screenTopic"></h1>
+          </div>
+          <div class="screen-meta">
+            <div class="screen-timer" id="screenTimer"></div>
+            <div class="screen-count" id="screenCount"></div>
+          </div>
+        </div>
+        <div class="screen-body">
+          <div class="screen-grid" id="screenGrid"></div>
+          <div class="screen-empty" id="screenEmpty">Waiting for the first drawing…</div>
+        </div>
+        <div class="screen-join" id="screenJoin">
+          <div class="screen-qr" id="screenQr"></div>
+          <div class="screen-join-text">
+            <div class="screen-join-lead">Join in</div>
+            <div class="screen-join-where" id="screenWhere"></div>
+            <div class="screen-join-code" id="screenCode"></div>
+          </div>
+        </div>
+        ${withExit ? '<button class="btn secondary small screen-exit" id="exitPresentBtn">Exit presentation</button>' : ''}
+      </div>`;
+  }
+
+  let lastScreenSignature = null;
+  let screenQrDone = false;
+
+  async function paintScreen(state, hidden){
+    const wrap = document.getElementById('screenWrap');
+    if(!wrap) return;
+
+    const topicEl = document.getElementById('screenTopic');
+    const eyebrow = document.getElementById('screenEyebrow');
+    const timerEl = document.getElementById('screenTimer');
+
+    const phaseLabel = state.phase === 'voting' ? 'Vote on your phone'
+                     : state.phase === 'results' ? 'Results' : 'Topic';
+    if(eyebrow.textContent !== phaseLabel) eyebrow.textContent = phaseLabel;
+    const topic = state.phase === 'results' ? '🏆 And the winner is…'
+                : state.phase === 'voting' ? (state.topic || 'Pick your favourite')
+                : topicText(state);
+    if(topicEl.textContent !== topic) topicEl.textContent = topic;
+
+    if(state.phase === 'drawing' && state.timerEnd){
+      const remaining = state.timerEnd - Date.now();
+      timerEl.textContent = fmtTime(remaining);
+      timerEl.classList.toggle('low', remaining < 15000);
+      timerEl.style.display = '';
+    } else {
+      timerEl.style.display = 'none';
+    }
+
+    /* Joining only matters while people can still draw. */
+    const joinEl = document.getElementById('screenJoin');
+    const showJoin = state.phase === 'drawing';
+    joinEl.style.display = showJoin ? '' : 'none';
+    if(showJoin && !screenQrDone){
+      const guestLink = participantUrl();
+      screenQrDone = paintQr(document.getElementById('screenQr'), guestLink, 190);
+      const where = window.location.origin + window.location.pathname;
+      document.getElementById('screenWhere').textContent =
+        where.replace(/^https?:\/\//, '').replace(/index\.html$/, '');
+      const codeEl = document.getElementById('screenCode');
+      codeEl.textContent = looksLikeCode(boardId) ? boardId : '';
+      codeEl.style.display = looksLikeCode(boardId) ? '' : 'none';
+    }
+
+    const submissions = await fetchBoard(state);
+    let counts = {};
+    let ordered = submissions;
+    if(state.phase === 'voting' || state.phase === 'results'){
+      counts = tallyVotes(await fetchVotes(state));
+      if(state.phase === 'results'){
+        ordered = [...submissions].sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0));
+      }
+    }
+
+    const countEl = document.getElementById('screenCount');
+    countEl.textContent = submissions.length
+      ? submissions.length + (submissions.length === 1 ? ' drawing' : ' drawings')
+      : '';
+
+    const grid = document.getElementById('screenGrid');
+    const empty = document.getElementById('screenEmpty');
+    empty.style.display = submissions.length ? 'none' : '';
+
+    const sig = viewSignature(ordered, counts, state.phase + '|' + (hidden ? 'h' : ''));
+    if(sig === lastScreenSignature) return;
+    lastScreenSignature = sig;
+
+    const topCount = state.phase === 'results' && ordered.length ? (counts[ordered[0].key] || 0) : -1;
+    grid.classList.toggle('drawings-hidden', !!hidden);
+
+    grid.innerHTML = ordered.map(item=>{
+      const name = esc(item.name || 'Anonymous');
+      const c = counts[item.key] || 0;
+      const isWinner = state.phase === 'results' && topCount > 0 && c === topCount;
+      const badge = (state.phase === 'voting' || state.phase === 'results')
+        ? `<div class="screen-votes">${c}</div>` : '';
+      return `
+        <div class="screen-card${isWinner ? ' winner' : ''}">
+          ${isWinner ? '<div class="screen-crown">👑</div>' : ''}
+          <img src="${esc(item.dataUrl)}" alt="Drawing by ${name}">
+          ${badge}
+          <div class="screen-name">${name}</div>
+        </div>`;
+    }).join('');
+
+    layoutScreenGrid();
+  }
+
+  /* Pick the column count that makes the drawings as large as possible while
+     still fitting the space — a projector is wide, so the limit is height. */
+  function layoutScreenGrid(){
+    const grid = document.getElementById('screenGrid');
+    const body = grid && grid.parentElement;
+    if(!grid || !body) return;
+    const n = grid.children.length;
+    if(!n){ grid.style.gridTemplateColumns = ''; return; }
+
+    const gap = parseFloat(getComputedStyle(grid).gap) || 16;
+    const nameRow = 30;                      /* name + card padding */
+    const w = body.clientWidth;
+    const h = body.clientHeight;
+    if(w <= 0 || h <= 0) return;
+
+    let bestCols = 1, bestSize = 0;
+    for(let cols = 1; cols <= n; cols++){
+      const rows = Math.ceil(n / cols);
+      const byWidth = (w - gap * (cols - 1)) / cols;
+      const byHeight = (h - gap * (rows - 1)) / rows - nameRow;
+      const size = Math.min(byWidth, byHeight);
+      if(size > bestSize){ bestSize = size; bestCols = cols; }
+    }
+    grid.style.gridTemplateColumns = `repeat(${bestCols}, ${Math.max(60, Math.floor(bestSize))}px)`;
+  }
+  window.addEventListener('resize', layoutScreenGrid);
+
+  /* Standalone second-screen route. */
+  async function screenPollLoop(){
+    const state = await getState();
+    if(readDenied){
+      const t = document.getElementById('screenTopic');
+      if(t) t.textContent = 'Waiting for the host to open this board…';
+    } else {
+      await paintScreen(state, !!state.hideDrawings);
+    }
+    setTimeout(screenPollLoop, POLL_MS);
+  }
+
+  function renderScreenView(){
+    app.innerHTML = screenShellMarkup(false);
+    screenPollLoop();
   }
 
   /* ================= HOST SIGN-IN ================= */
@@ -1521,6 +1773,34 @@
   let lastPurgeAt = 0;
   let sessionHeldOpen = true;   /* false once the host closes the door by hand */
   let drawingsHidden = false;
+  let presenting = false;
+
+  function enterPresentMode(){
+    if(presenting) return;
+    presenting = true;
+    lastScreenSignature = null;
+    screenQrDone = false;
+    const overlay = document.createElement('div');
+    overlay.className = 'screen-overlay';
+    overlay.id = 'screenOverlay';
+    overlay.innerHTML = screenShellMarkup(true);
+    document.body.appendChild(overlay);
+    document.getElementById('exitPresentBtn').addEventListener('click', exitPresentMode);
+    document.addEventListener('keydown', presentEscape);
+    if(document.documentElement.requestFullscreen){
+      document.documentElement.requestFullscreen().catch(()=>{});
+    }
+  }
+  function exitPresentMode(){
+    presenting = false;
+    const overlay = document.getElementById('screenOverlay');
+    if(overlay) overlay.remove();
+    document.removeEventListener('keydown', presentEscape);
+    if(document.fullscreenElement && document.exitFullscreen){
+      document.exitFullscreen().catch(()=>{});
+    }
+  }
+  function presentEscape(e){ if(e.key === 'Escape') exitPresentMode(); }
 
   function applyHiddenState(){
     const boardEl = document.getElementById('board');
@@ -1602,6 +1882,8 @@
             <span class="count" id="countText">0 drawings</span>
           </div>
           <div class="board-actions">
+            <button class="btn small" id="presentBtn">🖥 Present to the room</button>
+            <button class="btn secondary small" id="secondScreenBtn">Second screen</button>
             <button class="btn secondary small" id="hideBtn">🙈 Hide drawings</button>
             <button class="btn ghost small" id="switchBoardBtn" style="display:none;">Switch board</button>
             <button class="btn ghost small" id="signOutBtn2" style="display:none;">Sign out</button>
@@ -1731,11 +2013,27 @@
       }).catch(()=>{ showToast('Could not capture the board image — try a regular screenshot instead.'); });
     });
 
-    /* Hide the board for a reveal, or to stop guests copying each other. */
+    /* Hide the board for a reveal, or to stop guests copying each other.
+       Shared through state so a second screen hides at the same moment. */
     const hideBtn = document.getElementById('hideBtn');
-    hideBtn.addEventListener('click', ()=>{
+    hideBtn.addEventListener('click', async ()=>{
       drawingsHidden = !drawingsHidden;
       applyHiddenState();
+      const s = await getState();
+      s.hideDrawings = drawingsHidden;
+      await setState(s);
+    });
+
+    /* Put the audience view over this screen, controls and all kept out of it. */
+    const presentBtn = document.getElementById('presentBtn');
+    presentBtn.addEventListener('click', ()=> enterPresentMode());
+
+    document.getElementById('secondScreenBtn').addEventListener('click', ()=>{
+      const url = new URL(window.location.href);
+      url.searchParams.delete('host');
+      url.searchParams.set('screen', '1');
+      window.open(url.toString(), 'drawTopicScreen');
+      showToast('Opened the audience view — drag that window to the projector.');
     });
 
     if(isSignedInHost()){
@@ -1971,9 +2269,16 @@
       timerEl.textContent = '';
     }
 
+    /* A second screen may have been told to hide/show; follow the shared flag. */
+    if(typeof state.hideDrawings === 'boolean' && state.hideDrawings !== drawingsHidden){
+      drawingsHidden = state.hideDrawings;
+      applyHiddenState();
+    }
+
     /* Refresh first: the purge reads the cache that this populates. */
     await refreshHostBoard(state);
     await maybePurge(state);
+    if(presenting) await paintScreen(state, drawingsHidden);
     setTimeout(hostPollLoop, POLL_MS);
   }
 
@@ -2063,6 +2368,8 @@
   if(!dbUrl){
     if(isHost){ renderSetup(); }
     else { app.innerHTML = '<div class="setup-wrap"><div class="setup-card"><h2>Ask your host for the QR code</h2><p class="sub">This link is missing its board address.</p></div></div>'; }
+  } else if(params.get('screen') === '1' && boardId){
+    renderScreenView();
   } else if(isHost){
     startHost();
   } else if(!boardId && BUILT_IN.dbUrl){

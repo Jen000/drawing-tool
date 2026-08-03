@@ -104,6 +104,23 @@ A note on the word *board*. Before you lock down there is one shared board and
 "your board" just means the host page. Afterwards a board is a named thing you
 create and own, identified by `&b=…` in the URL, and you can have several.
 
+## The shared screen
+
+The board page is split in two, so the room never sees your controls.
+
+- **Present to the room** covers your screen with the audience view: topic,
+  timer, how to join, the drawings, and the winner at the end. No topic box, no
+  phase buttons, no account, no rules. It goes fullscreen; `Esc` or the faint
+  corner button brings your controls back.
+- **Second screen** opens the same view in its own window at `&screen=1`, for
+  when the projector is a second display and you want your controls on the
+  laptop. That URL needs no host account, so it also works on a spare tablet.
+
+The join QR and code show only while people can still draw, and the drawings
+size themselves to fill whatever screen they land on. **Hide drawings** is
+shared through the board, so the projector and your laptop hide and reveal
+together.
+
 ## Multiple presenters
 
 Each host signs in and gets their own boards. Create one per event, and the QR
