@@ -3140,7 +3140,7 @@
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card join-card">
-          ${canHost ? '<button class="btn ghost landing-signin" id="topSignInBtn">Sign in</button>' : ''}
+          <button class="btn ghost landing-signin" id="topSignInBtn">Sign in</button>
           <div class="landing-mark">🎨</div>
           <h2>Draw the Topic</h2>
           <p class="sub">Everyone draws the same topic on their phone, then the room votes for a favourite.</p>
@@ -3168,8 +3168,8 @@
             <div class="landing-label">Running the game?</div>
             <p class="landing-hint">${canHost
               ? 'Sign in with an email and password — free, takes a minute — then create a board and share its code with the room.'
-              : 'This copy has no board database set up yet. Open the host page to connect one.'}</p>
-            <button class="btn secondary landing-go" id="hostGoBtn">${canHost ? (returning ? 'Sign in as someone else' : 'Sign in or create an account') : 'Set up hosting'}</button>
+              : 'This copy has no board database yet. Add your own Firebase details to sign in and start hosting.'}</p>
+            <button class="btn secondary landing-go" id="hostGoBtn">${canHost ? (returning ? 'Sign in as someone else' : 'Sign in or create an account') : 'Add my Firebase details'}</button>
           </div>
 
           <button class="btn ghost landing-help" id="landingHelpBtn">New here? How this works</button>
@@ -3197,9 +3197,19 @@
       url.searchParams.set('host', '1');
       window.location.href = url.toString();
     }
-    document.getElementById('hostGoBtn').addEventListener('click', goHost);
-    const topSignIn = document.getElementById('topSignInBtn');
-    if(topSignIn) topSignIn.addEventListener('click', goHost);
+    function goSettings(){
+      const url = new URL(window.location.href);
+      url.searchParams.set('settings', '1');
+      window.location.href = url.toString();
+    }
+    /* Signing in needs a database to sign in to. With one already configured
+       (shared, or saved earlier in Settings) go straight to it; otherwise the
+       first step of "signing in" is adding one — Settings does that and then
+       lands on the sign-in form itself, so the button stays labelled Sign in
+       rather than forking into a separate, easy-to-miss setup path. */
+    const enterHost = canHost ? goHost : goSettings;
+    document.getElementById('hostGoBtn').addEventListener('click', enterHost);
+    document.getElementById('topSignInBtn').addEventListener('click', enterHost);
     const continueBtn = document.getElementById('continueBtn');
     if(continueBtn) continueBtn.addEventListener('click', goHost);
     /* Do not pop a keyboard at a returning host who is here to press one button. */
