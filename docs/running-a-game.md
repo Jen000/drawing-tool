@@ -14,6 +14,11 @@ this. If you want to set up your own copy instead, see
 
 ---
 
+> **Lost your board?** Go to the address, choose **Running the game? → Sign in
+> as host**, and every board you have made is listed there — from any laptop.
+> There is also a **Help** button on the landing page, the board list and the
+> board itself.
+
 ## Before the night
 
 ### 1. Make yourself a host account
@@ -34,7 +39,10 @@ You will land on the board with a **six-character code** like `4FDY8R` and a QR
 code. That is what the room uses to join. Bookmark this page.
 
 You can have as many boards as you like. **Switch board** at the top right takes
-you back to the list.
+you back to the list, which shows each board's code next to its name.
+
+**Copy host link** on the board copies the address of that exact board, if you
+want to mail it to yourself or park it in your notes.
 
 ---
 

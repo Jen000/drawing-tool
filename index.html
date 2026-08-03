@@ -231,6 +231,37 @@
   }
 
   .landing-mark{font-size:40px;line-height:1;margin-bottom:6px;}
+  .landing-help{width:100%;margin-top:20px;font-size:13.5px;}
+  .picker-note{font-size:12.5px;color:var(--ink-soft);margin:14px 0 0;line-height:1.5;}
+  .board-item-code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;
+    color:var(--ink);background:var(--surface);border:1px solid var(--line);
+    padding:1px 7px;border-radius:6px;letter-spacing:.06em;margin-right:8px;
+  }
+
+  .help-overlay{
+    position:fixed;inset:0;z-index:950;display:flex;align-items:center;justify-content:center;
+    padding:20px;background:rgba(8,12,25,.62);backdrop-filter:blur(4px);overflow-y:auto;
+  }
+  .help-card{
+    position:relative;background:var(--surface);color:var(--ink);
+    border:1px solid var(--line);border-radius:20px;padding:26px;
+    max-width:520px;width:100%;box-shadow:var(--shadow-lg);margin:auto;
+  }
+  .help-card h2{margin:0 0 16px;font-size:22px;}
+  .help-close{
+    position:absolute;top:14px;right:14px;background:var(--surface-2);color:var(--ink-soft);
+    width:30px;height:30px;border-radius:50%;font-size:13px;line-height:1;
+  }
+  .help-close:hover{background:var(--line);color:var(--ink);}
+  .help-section{margin-bottom:20px;}
+  .help-section:last-of-type{margin-bottom:0;}
+  .help-head{font-weight:700;font-size:15px;margin-bottom:6px;}
+  .help-section p{margin:0;color:var(--ink-soft);font-size:13.5px;line-height:1.6;}
+  .help-section ol{margin:0;padding-left:20px;color:var(--ink-soft);font-size:13.5px;line-height:1.75;}
+  .help-section strong{color:var(--ink);}
+  .help-url{background:var(--surface-2);padding:2px 6px;border-radius:5px;font-size:12.5px;word-break:break-all;}
+  .help-docs{display:block;text-align:center;margin-top:20px;text-decoration:none;}
   .landing-block{text-align:left;}
   .landing-label{font-weight:700;font-size:15px;margin-bottom:2px;}
   .landing-hint{color:var(--ink-soft);font-size:13.5px;margin:0 0 12px;line-height:1.5;}
@@ -516,7 +547,9 @@
      ============================================================ */
   const BUILT_IN = {
     dbUrl:  '',
-    apiKey: ''
+    apiKey: '',
+    /* Optional: a link to the guide, shown from the in-app help. */
+    docsUrl: ''
   };
 
   const params = new URLSearchParams(window.location.search);
@@ -1284,9 +1317,13 @@
               <h2>Your boards</h2>
               <p class="sub" style="margin:0;">Signed in as ${esc(auth.email || '')}</p>
             </div>
-            <button class="btn ghost small" id="signOutBtn">Sign out</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn ghost small" id="pickerHelpBtn">Help</button>
+              <button class="btn ghost small" id="signOutBtn">Sign out</button>
+            </div>
           </div>
           <div id="boardList" class="board-list"><p class="sub">Loading…</p></div>
+          <p class="picker-note">Your boards follow your account, so you can sign in from any laptop and they will be here.</p>
           <div class="picker-row">
             <input id="newBoardName" class="field" type="text" maxlength="40" placeholder="New board name (e.g. Friday Presentation Night)">
             <button class="btn" id="createBoardBtn">Create board</button>
@@ -1294,6 +1331,7 @@
         </div>
       </div>`;
 
+    document.getElementById('pickerHelpBtn').addEventListener('click', openHelp);
     document.getElementById('signOutBtn').addEventListener('click', ()=>{
       clearAuth();
       const url = new URL(window.location.href);
@@ -1316,7 +1354,10 @@
         <div class="board-item">
           <div class="board-item-main">
             <div class="board-item-name">${esc(b.name || 'Untitled board')}</div>
-            <div class="board-item-date">${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}</div>
+            <div class="board-item-date">
+              <span class="board-item-code">${esc(b.id)}</span>
+              ${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}
+            </div>
           </div>
           <button class="btn small" data-open="${esc(b.id)}">Open</button>
           <button class="btn ghost small" data-del="${esc(b.id)}">Delete</button>
@@ -2159,6 +2200,8 @@
             <button class="btn small" id="presentBtn">🖥 Present to the room</button>
             <button class="btn secondary small" id="secondScreenBtn">Second screen</button>
             <button class="btn secondary small" id="hideBtn">🙈 Hide drawings</button>
+            <button class="btn secondary small" id="copyHostLinkBtn">Copy host link</button>
+            <button class="btn ghost small" id="helpBtn">Help</button>
             <button class="btn ghost small" id="switchBoardBtn" style="display:none;">Switch board</button>
             <button class="btn ghost small" id="signOutBtn2" style="display:none;">Sign out</button>
           </div>
@@ -2327,6 +2370,16 @@
       const s = await getState();
       s.hideDrawings = drawingsHidden;
       await setState(s);
+    });
+
+    document.getElementById('helpBtn').addEventListener('click', openHelp);
+    document.getElementById('copyHostLinkBtn').addEventListener('click', async (e)=>{
+      const btn = e.target;
+      try{
+        await navigator.clipboard.writeText(window.location.href);
+        btn.textContent = 'Copied ✓';
+        setTimeout(()=>{ btn.textContent = 'Copy host link'; }, 2000);
+      }catch(err){ showToast('Copy failed — bookmark this page instead.'); }
     });
 
     /* Put the audience view over this screen, controls and all kept out of it. */
@@ -2629,6 +2682,58 @@
     applyHiddenState();
   }
 
+  /* "How would I even know how to host?" — the answer has to live in the app,
+     not only in a README nobody has a link to. */
+  function openHelp(){
+    if(document.getElementById('helpOverlay')) return;
+    const el = document.createElement('div');
+    el.className = 'help-overlay';
+    el.id = 'helpOverlay';
+    const here = window.location.origin + window.location.pathname;
+    el.innerHTML = `
+      <div class="help-card" role="dialog" aria-label="How this works">
+        <button class="help-close" id="helpClose" aria-label="Close">✕</button>
+        <h2>How this works</h2>
+
+        <div class="help-section">
+          <div class="help-head">🎨 Playing</div>
+          <p>Get the 6-character code from the presenter's screen, type it in, and draw.
+             You never sign in or install anything.</p>
+        </div>
+
+        <div class="help-section">
+          <div class="help-head">🖥 Hosting a game</div>
+          <ol>
+            <li><strong>Sign in</strong> with an email and password — it takes a minute and it is free.</li>
+            <li><strong>Create a board</strong> and name it after your event. You get a 6-character code.</li>
+            <li><strong>Press Present to the room</strong> so the big screen shows the code and drawings, and not your controls.</li>
+            <li><strong>Set a topic</strong>, start the timer, then open voting and show the results.</li>
+            <li><strong>New round</strong> clears the board for the next topic.</li>
+          </ol>
+        </div>
+
+        <div class="help-section">
+          <div class="help-head">↩︎ Getting back to your board</div>
+          <p>Your boards live with your account, not with this browser. Come back to
+             <code class="help-url">${esc(here.replace(/^https?:\/\//,''))}</code>,
+             choose <strong>Sign in as host</strong>, and every board you have made is listed there —
+             from any laptop.</p>
+        </div>
+
+        ${BUILT_IN.docsUrl ? `<a class="btn secondary help-docs" href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">Read the full guide</a>` : ''}
+      </div>`;
+    document.body.appendChild(el);
+    document.getElementById('helpClose').addEventListener('click', closeHelp);
+    el.addEventListener('click', (e)=>{ if(e.target === el) closeHelp(); });
+    document.addEventListener('keydown', helpEscape);
+  }
+  function closeHelp(){
+    const el = document.getElementById('helpOverlay');
+    if(el) el.remove();
+    document.removeEventListener('keydown', helpEscape);
+  }
+  function helpEscape(e){ if(e.key === 'Escape') closeHelp(); }
+
   /* Someone who just opens the address has no idea what to do next: they might
      be a player looking for a board, or a presenter about to run one. Ask. */
   function renderLanding(){
@@ -2655,10 +2760,12 @@
           <div class="landing-block">
             <div class="landing-label">Running the game?</div>
             <p class="landing-hint">${canHost
-              ? 'Sign in to put a board on the big screen and get a code for the room.'
+              ? 'Sign in with an email and password — free, takes a minute — then create a board and share its code with the room.'
               : 'This copy has no board database set up yet. Open the host page to connect one.'}</p>
             <button class="btn secondary landing-go" id="hostGoBtn">${canHost ? 'Sign in as host' : 'Set up hosting'}</button>
           </div>
+
+          <button class="btn ghost landing-help" id="landingHelpBtn">New here? How this works</button>
         </div>
       </div>`;
 
@@ -2677,6 +2784,7 @@
     }
     document.getElementById('joinBtn').addEventListener('click', join);
     input.addEventListener('keydown', e=>{ if(e.key === 'Enter') join(); });
+    document.getElementById('landingHelpBtn').addEventListener('click', openHelp);
     document.getElementById('hostGoBtn').addEventListener('click', ()=>{
       const url = new URL(window.location.href);
       url.searchParams.set('host', '1');

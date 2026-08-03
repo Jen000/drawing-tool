@@ -75,7 +75,8 @@ Near the top of `index.html`:
 ```js
 const BUILT_IN = {
   dbUrl:  'https://yourproject-default-rtdb.firebaseio.com',
-  apiKey: 'AIzaSy…'
+  apiKey: 'AIzaSy…',
+  docsUrl: ''   // optional: a link to these guides, shown in the app's Help
 };
 ```
 
