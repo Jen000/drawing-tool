@@ -18,29 +18,45 @@ Firebase "test mode" rules let anyone who has the database URL read, write and
 delete anything, at any time. Fine for a one-off, but the URL is the only thing
 protecting the board — including the day after your event.
 
-### Locked down (recommended for recurring nights)
+### Locked down (recommended, and required for host accounts)
 
 Guests still just scan and draw — nothing changes for them. Behind the scenes
 they are signed in anonymously, and the rules only accept their drawings while
-your board is actually open.
+your board is actually open. Hosts sign in with an email and password, which is
+what lets several presenters share one deployment.
 
-1. Firebase → **Build → Authentication → Get started → Anonymous → Enable**.
+1. Firebase → **Build → Authentication → Get started**, and enable **both**
+   sign-in providers: **Anonymous** (guests) and **Email/Password** (hosts).
 2. Firebase → **Project settings → General** → copy the **Web API key**.
-3. Open your board, expand **Security & access**, paste the key, and press
-   *Turn on locked-down mode*. Your board URL gains a `&key=…` parameter — use
-   that URL from now on, and re-generate your QR code from it.
-4. Copy the rules shown there (they already contain your host ID) into
-   **Realtime Database → Rules**, and press Publish.
+3. Open the board with `?host=1&db=…`, expand **Security & access**, paste the
+   key, and press *Turn on locked-down mode*. The URL gains a `&key=…`
+   parameter — use that URL from now on.
+4. Paste `firebase-rules.json` into **Realtime Database → Rules** and press
+   Publish. The rules are the same for everyone; there is nothing to fill in.
 
-`firebase-rules.json` in this repo is the same policy with a `__HOST_UID__`
-placeholder, if you would rather paste it by hand.
+## Multiple presenters
 
-#### What the rules enforce
+Each host signs in and gets their own boards. Create one per event, and the QR
+code carries that board's id (`&b=…`), so two presenters can run their nights
+side by side without ever seeing each other's drawings, topics or rounds.
+
+- **Your boards travel with your account**, not with a browser — sign in on the
+  laptop plugged into the projector and your boards are there.
+- **Switch board** returns to the picker; **Sign out** clears the account from
+  that browser.
+- Deleting a board removes its drawings and votes from Firebase.
+
+Hosting is invite-based on purpose: whoever you give the QR code to can join.
+
+### What the rules enforce
 
 - **The session window.** Your board writes `session/openUntil` every few
   minutes while it is on screen. Guests can only read or write while that
   timestamp is in the future, so an old QR code stops working roughly half an
   hour after you close the board — and `Close session` shuts it immediately.
+- **Boards are owned.** The first account to claim a board owns it for good, and
+  ownership cannot be transferred or stolen. Only the owner can set the topic,
+  change phase, open or close the session, or delete anything.
 - **Guests add, they never edit.** A drawing can be created but not overwritten
   or deleted, so nobody can vandalise or wipe the board.
 - **Shape and size limits.** A drawing must be a JPEG data URL under 400 KB with
@@ -48,20 +64,21 @@ placeholder, if you would rather paste it by hand.
   fields.
 - **One vote each.** Votes are keyed by the voter's own uid, must point at a
   drawing that exists, and cannot be changed once cast.
-- **The host owns everything else.** Only your host ID can set the topic, change
-  phase, open or close the session, and delete drawings.
+- **Board lists are private.** Only you can read or write the list of boards
+  your account owns.
 
-Your host ID is tied to the browser you host from. If you present from a
-different laptop, open the board there and copy the rules again from that
-device.
-
-#### What this does not do
+### What this does not do
 
 Anonymous sign-in identifies a client, it does not vet one. The Web API key is
 public by design (it ships in every Firebase web app), so someone who has your
 QR link could still sign in and add a drawing *while your session is open* —
-the same as anyone in the room. The protections above are about what they can
-do and when, not about proving who they are.
+the same as anyone in the room. That is the intended model: you hand out the QR
+code to the people you want drawing.
+
+Board isolation is about ownership and writes, not secrecy. A board id is a
+random string that only travels in that board's QR link, but anyone who has an
+id can read that board while it is open. Treat the drawings as public to
+whoever you gave the link to.
 
 ## Data retention
 

@@ -7,9 +7,12 @@
 <title>Draw the Topic</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"></noscript>
+<!-- deferred: venue wifi should never be able to stop the board from rendering -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
   :root{
@@ -158,6 +161,11 @@
   .size-btn.active{background:var(--accent);}
   .size-btn.active span{background:#fff;}
   .divider{width:1px;align-self:stretch;background:var(--line);flex:0 0 auto;margin:2px 4px;}
+  .tool-label{
+    font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-soft);
+    font-weight:700;flex:0 0 auto;
+  }
+  .recent-swatches{display:flex;gap:8px;align-items:center;}
 
   .db-bottom{
     display:flex;gap:8px;padding:10px;background:var(--surface);
@@ -275,9 +283,38 @@
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace;max-height:340px;overflow-y:auto;
   }
 
-  .board-header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0 4px 16px;}
-  .board-header h1{font-size:22px;margin:0;}
+  .picker-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px;}
+  .picker-head h2{margin:0 0 2px;}
+  .board-list{display:flex;flex-direction:column;gap:10px;}
+  .board-item{
+    display:flex;align-items:center;gap:10px;padding:12px 14px;
+    border:1px solid var(--line);border-radius:14px;background:var(--surface-2);
+  }
+  .picker-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px;}
+  .picker-row .field{flex:1 1 220px;min-width:0;}
+  .board-item-main{flex:1;min-width:0;}
+  .board-item-name{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .board-item-date{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+
+  .board-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 4px 16px;flex-wrap:wrap;}
+  .board-title-wrap{display:flex;align-items:baseline;gap:12px;min-width:0;flex-wrap:wrap;}
+  .board-header h1{font-size:22px;margin:0;overflow:hidden;text-overflow:ellipsis;}
   .board-header .count{font-size:13px;color:rgba(238,241,248,.6);}
+  .board-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .board-actions .btn.secondary{background:rgba(255,255,255,.09);color:#eef1f8;border-color:rgba(255,255,255,.16);box-shadow:none;}
+  .board-actions .btn.secondary:hover{background:rgba(255,255,255,.16);}
+  .board-actions .btn.secondary.active-hide{background:var(--warn);color:#1a1205;border-color:transparent;}
+  .board-actions .btn.ghost{color:rgba(238,241,248,.7);}
+  .board-actions .btn.ghost:hover{background:rgba(255,255,255,.1);color:#fff;}
+
+  /* Hide for a reveal: the cards stay in place, the drawings are unreadable. */
+  #board.drawings-hidden .pin-card img{filter:blur(26px);transform:scale(.96);}
+  #board.drawings-hidden .pin-card .who{visibility:hidden;}
+  #board.drawings-hidden .pin-card .votes-badge{opacity:.35;}
+  #board .pin-card img{transition:filter .35s ease, transform .35s ease;}
+  .hidden-banner{
+    text-align:center;color:rgba(238,241,248,.75);font-size:13px;padding:0 20px 24px;
+  }
   #board{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:18px;padding:0 4px 24px;}
   .pin-card{
     background:var(--surface);border-radius:16px;padding:10px;position:relative;
@@ -304,6 +341,42 @@
     z-index:999;max-width:90%;text-align:center;box-shadow:var(--shadow-lg);
     border:1px solid rgba(255,255,255,.12);
   }
+  /* ---- landscape phones: put the controls in a side rail so the canvas
+          keeps the full height instead of being squeezed to nothing ---- */
+  @media (orientation:landscape) and (max-height:600px){
+    .draw-shell{
+      display:grid;
+      grid-template-columns:1fr minmax(210px, 38vw);
+      grid-template-rows:auto 1fr auto;
+      grid-template-areas:"canvas top" "canvas tools" "canvas bottom";
+      padding-right:env(safe-area-inset-right);
+    }
+    .db-top{
+      grid-area:top;padding:8px 12px;border-bottom:1px solid var(--line);border-left:1px solid var(--line);
+      padding-top:calc(8px + env(safe-area-inset-top));
+    }
+    .db-top .topic-text{font-size:15px;white-space:normal;overflow:visible;max-height:2.6em;}
+    .canvas-area{grid-area:canvas;padding:8px;}
+    .db-toolbar{
+      grid-area:tools;border-top:none;border-left:1px solid var(--line);
+      overflow-y:auto;padding:8px;
+    }
+    .db-toolbar .tool-row{flex-wrap:wrap;overflow:visible;gap:6px;}
+    .db-toolbar .tool-row + .tool-row{margin-top:6px;}
+    /* tighten everything so the whole toolset fits without scrolling */
+    .db-toolbar .swatch,
+    .db-toolbar .color-picker-wrap{width:24px;height:24px;}
+    .db-toolbar .recent-swatches{gap:6px;}
+    .db-toolbar .tool-btn{padding:6px 9px;font-size:11.5px;}
+    .db-toolbar .size-btn{width:27px;height:27px;}
+    .db-bottom{
+      grid-area:bottom;flex-wrap:wrap;border-left:1px solid var(--line);padding:7px;gap:6px;
+    }
+    /* one row, so the vertical space goes to the tools instead */
+    .db-bottom .field{flex:1 1 90px;min-width:80px;padding:9px 11px;}
+    .db-bottom .btn{flex:0 0 auto;padding:9px 12px;}
+  }
+
   @media (max-width:720px){
     .host-wrap{padding:16px;}
     .host-top{grid-template-columns:1fr;}
@@ -320,9 +393,14 @@
   const params = new URLSearchParams(window.location.search);
   const isHost = params.get('host') === '1';
   const dbUrl = params.get('db');
-  const apiKey = params.get('key');          /* present => locked-down mode */
+  const apiKey = params.get('key');          /* present => accounts + locked down */
+  const boardId = params.get('b');           /* which presenter's board this is */
   const app = document.getElementById('app');
   const POLL_MS = 4000;
+
+  /* Every presenter gets their own board. Links made before boards existed
+     have no id and keep using the original top-level paths. */
+  function bp(path){ return boardId ? 'boards/' + boardId + '/' + path : path; }
 
   /* The host holds the door open in slices while the board is on screen, so an
      old QR code is dead a short while after the presentation ends. */
@@ -367,30 +445,74 @@
      window below is what decides *when* those clients are allowed to write. */
   const AUTH_ENABLED = !!apiKey;
   const LS_KEY = 'drawTopicAuth:' + (apiKey || '');
-  const auth = { idToken:null, refreshToken:null, uid:null, expiresAt:0, error:null };
+  const auth = { idToken:null, refreshToken:null, uid:null, email:null, isAnon:true, expiresAt:0, error:null };
 
   function storeAuth(){
-    try{ localStorage.setItem(LS_KEY, JSON.stringify({ refreshToken:auth.refreshToken, uid:auth.uid })); }catch(e){}
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify({
+        refreshToken:auth.refreshToken, uid:auth.uid, email:auth.email, isAnon:auth.isAnon
+      }));
+    }catch(e){}
+  }
+  function clearAuth(){
+    auth.idToken = null; auth.refreshToken = null; auth.uid = null;
+    auth.email = null; auth.isAnon = true; auth.expiresAt = 0; auth.error = null;
+    try{ localStorage.removeItem(LS_KEY); }catch(e){}
   }
   (function loadStoredAuth(){
     if(!AUTH_ENABLED) return;
     try{
       const raw = localStorage.getItem(LS_KEY);
-      if(raw){ const o = JSON.parse(raw); auth.refreshToken = o.refreshToken || null; auth.uid = o.uid || null; }
+      if(raw){
+        const o = JSON.parse(raw);
+        auth.refreshToken = o.refreshToken || null;
+        auth.uid = o.uid || null;
+        auth.email = o.email || null;
+        auth.isAnon = o.isAnon !== false;
+      }
     }catch(e){}
   })();
 
+  async function idpCall(method, payload){
+    const res = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:' + method + '?key=' + encodeURIComponent(apiKey), {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(()=>({}));
+    return { ok: res.ok, data };
+  }
+  function applyIdpSession(data, isAnon){
+    auth.idToken = data.idToken; auth.refreshToken = data.refreshToken; auth.uid = data.localId;
+    auth.email = data.email || null; auth.isAnon = isAnon;
+    auth.expiresAt = Date.now() + (parseInt(data.expiresIn,10) || 3600) * 1000;
+    auth.error = null; storeAuth();
+  }
+
   async function signInAnonymously(){
     try{
-      const res = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + encodeURIComponent(apiKey), {
-        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ returnSecureToken:true })
-      });
-      const data = await res.json().catch(()=>({}));
-      if(!res.ok){ auth.error = (data.error && data.error.message) || 'SIGN_IN_FAILED'; return false; }
-      auth.idToken = data.idToken; auth.refreshToken = data.refreshToken; auth.uid = data.localId;
-      auth.expiresAt = Date.now() + (parseInt(data.expiresIn,10) || 3600) * 1000;
-      auth.error = null; storeAuth(); return true;
+      const { ok, data } = await idpCall('signUp', { returnSecureToken:true });
+      if(!ok){ auth.error = (data.error && data.error.message) || 'SIGN_IN_FAILED'; return false; }
+      applyIdpSession(data, true);
+      return true;
     }catch(e){ auth.error = 'NETWORK'; return false; }
+  }
+
+  /* Hosts use a real account, so their identity — and the boards they own —
+     follow them to any device instead of living in one browser. */
+  async function signInWithPassword(email, password, isNewAccount){
+    try{
+      const { ok, data } = await idpCall(isNewAccount ? 'signUp' : 'signInWithPassword',
+        { email, password, returnSecureToken:true });
+      if(!ok) return { ok:false, code:(data.error && data.error.message) || 'SIGN_IN_FAILED' };
+      applyIdpSession(data, false);
+      return { ok:true };
+    }catch(e){ return { ok:false, code:'NETWORK' }; }
+  }
+
+  async function sendPasswordReset(email){
+    try{
+      const { ok, data } = await idpCall('sendOobCode', { requestType:'PASSWORD_RESET', email });
+      return { ok, code:(data.error && data.error.message) || '' };
+    }catch(e){ return { ok:false, code:'NETWORK' }; }
   }
 
   async function refreshIdToken(){
@@ -413,14 +535,18 @@
     if(!AUTH_ENABLED) return null;
     if(auth.idToken && Date.now() < auth.expiresAt - 300000) return auth.idToken;
     if(!authPromise){
-      /* Reuse the stored identity where possible so the host keeps the same
-         host ID across nights on this device. */
-      authPromise = (async ()=>{ if(!(await refreshIdToken())) await signInAnonymously(); })()
-        .finally(()=>{ authPromise = null; });
+      /* Guests are signed in silently; hosts are never auto-signed-in, so the
+         board can ask them for their account instead. */
+      authPromise = (async ()=>{
+        if(await refreshIdToken()) return;
+        if(!isHost) await signInAnonymously();
+      })().finally(()=>{ authPromise = null; });
     }
     await authPromise;
     return auth.idToken;
   }
+
+  function isSignedInHost(){ return !!(auth.idToken && !auth.isAnon); }
 
   /* ---------- Firebase Realtime Database storage layer ---------- */
   let readDenied = false;    /* rules refused the last read (session closed) */
@@ -473,20 +599,76 @@
   }
 
   /* ---------- session window (host-controlled write gate) ---------- */
-  async function openSessionWindow(){ return dbPut('session/openUntil', serverNow() + SESSION_WINDOW_MS); }
-  async function closeSessionWindow(){ return dbPut('session/openUntil', 0); }
+  async function openSessionWindow(){ return dbPut(bp('session/openUntil'), serverNow() + SESSION_WINDOW_MS); }
+  async function closeSessionWindow(){ return dbPut(bp('session/openUntil'), 0); }
   async function getSessionOpenUntil(){
-    const v = await dbGet('session/openUntil');
+    const v = await dbGet(bp('session/openUntil'));
     return typeof v === 'number' ? v : 0;
+  }
+
+  /* ---------- boards: one per presenter, so several people can run their own
+     night off the same deployment without touching each other's drawings ---- */
+  function newBoardId(){ return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+
+  async function listMyBoards(){
+    if(!auth.uid) return [];
+    const obj = await dbGet('users/' + auth.uid + '/boards');
+    return Object.keys(obj)
+      .map(id=>({ id, ...obj[id] }))
+      .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  }
+  async function createBoard(name){
+    const id = newBoardId();
+    const createdAt = Date.now();
+    const clean = (name || '').trim() || 'Untitled board';
+    /* Claim it first — the rules only accept an owner while there isn't one. */
+    if(!(await dbPut('boards/' + id + '/owner', auth.uid))) return null;
+    await dbPut('boards/' + id + '/meta', { name: clean, createdAt });
+    await dbPut('boards/' + id + '/state', { ...DEFAULT_STATE, round: 'r' + createdAt, roundStartedAt: createdAt });
+    await dbPut('users/' + auth.uid + '/boards/' + id, { name: clean, createdAt });
+    return id;
+  }
+  async function deleteBoard(id){
+    const ok = await dbDelete('boards/' + id);
+    await dbDelete('users/' + auth.uid + '/boards/' + id);
+    return ok;
+  }
+  async function getBoardMeta(){
+    if(!boardId) return null;
+    const m = await dbGet(bp('meta'));
+    return m && m.name ? m : null;
+  }
+  function boardUrl(id){
+    const url = new URL(window.location.href);
+    url.searchParams.set('host', '1');
+    url.searchParams.set('b', id);
+    return url.toString();
+  }
+
+  function authErrorText(code){
+    switch(code){
+      case 'EMAIL_EXISTS': return 'That email already has an account — try signing in instead.';
+      case 'EMAIL_NOT_FOUND':
+      case 'INVALID_PASSWORD':
+      case 'INVALID_LOGIN_CREDENTIALS': return 'Email or password not recognised.';
+      case 'OPERATION_NOT_ALLOWED': return 'Email sign-in is not enabled for this Firebase project yet.';
+      case 'TOO_MANY_ATTEMPTS_TRY_LATER': return 'Too many attempts — wait a minute and try again.';
+      case 'MISSING_PASSWORD': return 'Enter a password.';
+      case 'INVALID_EMAIL': return 'That does not look like an email address.';
+      case 'NETWORK': return 'Could not reach Firebase — check your connection.';
+      default:
+        if((code||'').startsWith('WEAK_PASSWORD')) return 'Use a password of at least 6 characters.';
+        return 'Could not sign in (' + (code || 'unknown error') + ').';
+    }
   }
 
   const DEFAULT_STATE = { topic: '', phase: 'drawing', timerEnd: null, round: 'r0', roundStartedAt: 0 };
   async function getState(){
-    const obj = await dbGet('state');
+    const obj = await dbGet(bp('state'));
     if(obj && obj.phase) return { ...DEFAULT_STATE, ...obj };
     return { ...DEFAULT_STATE };
   }
-  async function setState(state){ return await dbPut('state', state); }
+  async function setState(state){ return await dbPut(bp('state'), state); }
 
   /* Locked down, the vote key is the signed-in uid so the rules can enforce
      one vote per person. Otherwise fall back to a per-tab random id. */
@@ -513,12 +695,12 @@
   }
 
   async function fetchBoard(state){
-    const obj = await dbGet('board');
+    const obj = await dbGet(bp('board'));
     const items = Object.keys(obj).map(k=>({ key:k, ...obj[k] })).filter(i=>isCurrentRound(i, state));
     return items.sort((a,b)=>(b.ts||0)-(a.ts||0));
   }
   async function fetchVotes(state){
-    const obj = await dbGet('votes');
+    const obj = await dbGet(bp('votes'));
     return Object.keys(obj).map(k=>obj[k]).filter(v=>isCurrentRound(v, state));
   }
   function tallyVotes(votes){
@@ -530,15 +712,15 @@
   /* Remove everything the current round doesn't need. Returns true when the
      database is confirmed clean. */
   async function wipeRoundData(){
-    await dbDelete('board');
-    await dbDelete('votes');
-    let board = await dbGet('board');
-    let votes = await dbGet('votes');
+    await dbDelete(bp('board'));
+    await dbDelete(bp('votes'));
+    let board = await dbGet(bp('board'));
+    let votes = await dbGet(bp('votes'));
     if(Object.keys(board).length || Object.keys(votes).length){
-      await dbDelete('board');
-      await dbDelete('votes');
-      board = await dbGet('board');
-      votes = await dbGet('votes');
+      await dbDelete(bp('board'));
+      await dbDelete(bp('votes'));
+      board = await dbGet(bp('board'));
+      votes = await dbGet(bp('votes'));
     }
     return Object.keys(board).length === 0 && Object.keys(votes).length === 0;
   }
@@ -547,10 +729,10 @@
      or interrupted wipe, so old drawings never sit in Firebase. */
   async function purgeStaleData(state){
     const stale = [];
-    const board = await dbGet('board');
-    Object.keys(board).forEach(k=>{ if(!isCurrentRound(board[k], state)) stale.push('board/'+k); });
-    const votes = await dbGet('votes');
-    Object.keys(votes).forEach(k=>{ if(!isCurrentRound(votes[k], state)) stale.push('votes/'+k); });
+    const board = await dbGet(bp('board'));
+    Object.keys(board).forEach(k=>{ if(!isCurrentRound(board[k], state)) stale.push(bp('board/'+k)); });
+    const votes = await dbGet(bp('votes'));
+    Object.keys(votes).forEach(k=>{ if(!isCurrentRound(votes[k], state)) stale.push(bp('votes/'+k)); });
     for(const path of stale){ await dbDelete(path); }
     return stale.length;
   }
@@ -593,6 +775,151 @@
       if(key) url.searchParams.set('key', key);
       window.location.href = url.toString();
     });
+  }
+
+  /* ================= HOST SIGN-IN ================= */
+  function renderHostAuth(){
+    let mode = 'signin';
+    function paint(){
+      const isNew = mode === 'signup';
+      app.innerHTML = `
+        <div class="setup-wrap">
+          <div class="setup-card">
+            <h2>${isNew ? 'Create a host account' : 'Host sign-in'}</h2>
+            <p class="sub">${isNew
+              ? 'Your account keeps your boards with you, on any device you present from.'
+              : 'Sign in to open your boards. Guests never sign in — they just scan your QR code.'}</p>
+            <label class="eyebrow" for="hostEmail">Email</label>
+            <input id="hostEmail" class="field" style="margin:8px 0 14px;" type="email" autocomplete="email" placeholder="you@example.com">
+            <label class="eyebrow" for="hostPass">Password</label>
+            <input id="hostPass" class="field" style="margin:8px 0 4px;" type="password"
+                   autocomplete="${isNew ? 'new-password' : 'current-password'}" placeholder="${isNew ? 'At least 6 characters' : 'Your password'}">
+            <div class="err" id="authErr"></div>
+            <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <button class="btn" id="authGo">${isNew ? 'Create account' : 'Sign in'}</button>
+              <button class="btn ghost small" id="authSwap">${isNew ? 'I already have an account' : 'Create an account'}</button>
+              ${isNew ? '' : '<button class="btn ghost small" id="authReset">Forgot password</button>'}
+            </div>
+          </div>
+        </div>`;
+
+      const emailEl = document.getElementById('hostEmail');
+      const passEl = document.getElementById('hostPass');
+      const errEl = document.getElementById('authErr');
+
+      async function submit(){
+        const email = emailEl.value.trim();
+        const password = passEl.value;
+        if(!email || !password){ errEl.textContent = 'Enter your email and password.'; return; }
+        const btn = document.getElementById('authGo');
+        btn.disabled = true; btn.textContent = '…';
+        const res = await signInWithPassword(email, password, isNew);
+        if(!res.ok){
+          errEl.textContent = authErrorText(res.code);
+          btn.disabled = false; btn.textContent = isNew ? 'Create account' : 'Sign in';
+          return;
+        }
+        startHost();
+      }
+      document.getElementById('authGo').addEventListener('click', submit);
+      passEl.addEventListener('keydown', e=>{ if(e.key === 'Enter') submit(); });
+      document.getElementById('authSwap').addEventListener('click', ()=>{ mode = isNew ? 'signin' : 'signup'; paint(); });
+      const resetBtn = document.getElementById('authReset');
+      if(resetBtn){
+        resetBtn.addEventListener('click', async ()=>{
+          const email = emailEl.value.trim();
+          if(!email){ errEl.textContent = 'Enter your email first, then press Forgot password.'; return; }
+          const r = await sendPasswordReset(email);
+          errEl.textContent = r.ok ? '' : authErrorText(r.code);
+          if(r.ok) showToast('Password reset email sent to ' + email);
+        });
+      }
+    }
+    paint();
+  }
+
+  /* ================= BOARD PICKER ================= */
+  async function renderBoardPicker(){
+    app.innerHTML = `
+      <div class="setup-wrap">
+        <div class="setup-card">
+          <div class="picker-head">
+            <div>
+              <h2>Your boards</h2>
+              <p class="sub" style="margin:0;">Signed in as ${esc(auth.email || '')}</p>
+            </div>
+            <button class="btn ghost small" id="signOutBtn">Sign out</button>
+          </div>
+          <div id="boardList" class="board-list"><p class="sub">Loading…</p></div>
+          <div class="picker-row">
+            <input id="newBoardName" class="field" type="text" maxlength="40" placeholder="New board name (e.g. Friday Presentation Night)">
+            <button class="btn" id="createBoardBtn">Create board</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('signOutBtn').addEventListener('click', ()=>{
+      clearAuth();
+      const url = new URL(window.location.href);
+      url.searchParams.delete('b');
+      window.location.href = url.toString();
+    });
+
+    async function paintList(){
+      const listEl = document.getElementById('boardList');
+      const boards = await listMyBoards();
+      if(readDenied){
+        listEl.innerHTML = '<p class="err">Firebase refused this account. Publish the database rules from the README, then reload.</p>';
+        return;
+      }
+      if(!boards.length){
+        listEl.innerHTML = '<p class="sub">No boards yet — create your first one below.</p>';
+        return;
+      }
+      listEl.innerHTML = boards.map(b=>`
+        <div class="board-item">
+          <div class="board-item-main">
+            <div class="board-item-name">${esc(b.name || 'Untitled board')}</div>
+            <div class="board-item-date">${b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}</div>
+          </div>
+          <button class="btn small" data-open="${esc(b.id)}">Open</button>
+          <button class="btn ghost small" data-del="${esc(b.id)}">Delete</button>
+        </div>`).join('');
+      listEl.querySelectorAll('[data-open]').forEach(el=>{
+        el.addEventListener('click', ()=>{ window.location.href = boardUrl(el.getAttribute('data-open')); });
+      });
+      listEl.querySelectorAll('[data-del]').forEach(el=>{
+        el.addEventListener('click', async ()=>{
+          const id = el.getAttribute('data-del');
+          if(!confirm('Delete this board?\n\nIts drawings and votes are removed from Firebase.')) return;
+          el.disabled = true;
+          await deleteBoard(id);
+          paintList();
+        });
+      });
+    }
+    paintList();
+
+    document.getElementById('createBoardBtn').addEventListener('click', async ()=>{
+      const btn = document.getElementById('createBoardBtn');
+      btn.disabled = true; btn.textContent = 'Creating…';
+      const id = await createBoard(document.getElementById('newBoardName').value);
+      if(!id){
+        btn.disabled = false; btn.textContent = 'Create board';
+        showToast('Could not create the board — check the database rules are published.');
+        return;
+      }
+      window.location.href = boardUrl(id);
+    });
+  }
+
+  async function startHost(){
+    /* Test mode has no accounts: one shared board, exactly as before. */
+    if(!AUTH_ENABLED){ renderHostView(); return; }
+    await getIdToken();
+    if(!isSignedInHost()){ renderHostAuth(); return; }
+    if(!boardId){ renderBoardPicker(); return; }
+    renderHostView();
   }
 
   /* ================= DRAW VIEW (participant) ================= */
@@ -718,6 +1045,10 @@
           </div>
         </div>
         <div class="db-toolbar">
+          <div class="tool-row" id="recentRow" style="display:none;">
+            <span class="tool-label">Recent</span>
+            <div class="recent-swatches" id="recentSwatches"></div>
+          </div>
           <div class="tool-row" id="colorRow"></div>
           <div class="tool-row" id="modeRow"></div>
         </div>
@@ -761,29 +1092,67 @@
     const colors = ['#0f1729','#ffffff','#e5484d','#f76b15','#f5a524','#ecd94a','#5fae5f','#2f9e68','#3ba3a3','#3b5a8a','#5b5bd6','#c15a9e','#8a5a3c'];
     let currentColor = colors[0];
     const colorRow = document.getElementById('colorRow');
+
+    /* The three colours this person reached for most recently, kept for the
+       length of the session so they don't hunt through the palette again. */
+    const RECENT_KEY = 'drawTopicRecent:' + (boardId || 'default');
+    const RECENT_MAX = 3;
+    let recentColors = [];
+    try{
+      const raw = localStorage.getItem(RECENT_KEY);
+      if(raw) recentColors = (JSON.parse(raw) || []).filter(c=>/^#[0-9a-f]{6}$/i.test(c)).slice(0, RECENT_MAX);
+    }catch(e){ recentColors = []; }
+
+    function noteRecentColor(c){
+      const norm = String(c).toLowerCase();
+      recentColors = [norm, ...recentColors.filter(x=>x !== norm)].slice(0, RECENT_MAX);
+      try{ localStorage.setItem(RECENT_KEY, JSON.stringify(recentColors)); }catch(e){}
+      paintRecent();
+    }
+    function paintRecent(){
+      const row = document.getElementById('recentRow');
+      const wrap = document.getElementById('recentSwatches');
+      if(!row || !wrap) return;
+      if(!recentColors.length){ row.style.display = 'none'; return; }
+      row.style.display = '';
+      wrap.innerHTML = '';
+      recentColors.forEach(c=>{
+        const s = document.createElement('button');
+        s.type = 'button';
+        s.className = 'swatch' + (c === String(currentColor).toLowerCase() ? ' active' : '');
+        s.style.background = c;
+        s.setAttribute('aria-label', 'Recent colour ' + c);
+        s.addEventListener('click', ()=>{ pickColor(c); });
+        wrap.appendChild(s);
+      });
+    }
+    /* One place every colour choice goes through, so recents stay honest. */
+    function pickColor(c, opts){
+      currentColor = c;
+      [...colorRow.querySelectorAll('.swatch')].forEach(el=>{
+        el.classList.toggle('active', el.dataset.color === String(c).toLowerCase());
+      });
+      if(currentMode === 'eraser') setMode('pen');
+      if(!opts || opts.remember !== false) noteRecentColor(c);
+      else paintRecent();
+    }
     colors.forEach((c,i)=>{
       const s = document.createElement('button');
       s.type = 'button';
       s.className = 'swatch' + (i===0 ? ' active' : '');
       s.style.background = c;
+      s.dataset.color = c.toLowerCase();
       s.setAttribute('aria-label', 'Colour ' + c);
-      s.addEventListener('click', ()=>{
-        currentColor = c;
-        [...colorRow.querySelectorAll('.swatch')].forEach(el=>el.classList.remove('active'));
-        s.classList.add('active');
-        if(currentMode === 'eraser') setMode('pen');
-      });
+      s.addEventListener('click', ()=> pickColor(c));
       colorRow.appendChild(s);
     });
     const pickerWrap = document.createElement('div');
     pickerWrap.className = 'color-picker-wrap';
     pickerWrap.innerHTML = `<input type="color" id="customColor" value="#0f1729" aria-label="Custom colour">`;
     colorRow.appendChild(pickerWrap);
-    document.getElementById('customColor').addEventListener('input', (e)=>{
-      currentColor = e.target.value;
-      [...colorRow.querySelectorAll('.swatch')].forEach(el=>el.classList.remove('active'));
-      if(currentMode === 'eraser') setMode('pen');
-    });
+    /* 'input' fires all through the drag, so only record once it settles. */
+    document.getElementById('customColor').addEventListener('input', (e)=> pickColor(e.target.value, {remember:false}));
+    document.getElementById('customColor').addEventListener('change', (e)=> pickColor(e.target.value));
 
     const modeRow = document.getElementById('modeRow');
     const modes = [
@@ -841,6 +1210,8 @@
       });
       modeRow.appendChild(b);
     });
+
+    paintRecent();
 
     /* Canvas pixels are 1200×1200 regardless of how big the stage is on screen. */
     function strokeWidth(){ return currentMode === 'eraser' ? currentSize * 3 : currentSize; }
@@ -924,7 +1295,7 @@
       const latest = await getState();
       const key = 'd' + Date.now() + Math.random().toString(36).slice(2,8);
       /* Written at its exact path so the rules validate this one drawing. */
-      const ok = await dbPut('board/' + key, { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round });
+      const ok = await dbPut(bp('board/' + key), { name, dataUrl: exportDrawing(), ts: Date.now(), round: latest.round });
       if(!ok){
         btn.disabled = false; btn.textContent = 'Add';
         showToast(writeDenied ? 'The host has closed this session — nothing can be added right now.'
@@ -978,7 +1349,7 @@
         btn.addEventListener('click', async ()=>{
           btn.disabled = true; btn.textContent = 'Saving…';
           const voterId = await getVoterId();
-          const ok = await dbPut('votes/' + voterId, { choice: item.key, ts: Date.now(), round });
+          const ok = await dbPut(bp('votes/' + voterId), { choice: item.key, ts: Date.now(), round });
           if(!ok){
             showToast(writeDenied ? 'Voting is closed for this session.' : 'Vote did not save — try again.');
             btn.disabled = false; btn.textContent = 'Vote for this';
@@ -1028,6 +1399,19 @@
   let lastPurgedRound = null;
   let lastPurgeAt = 0;
   let sessionHeldOpen = true;   /* false once the host closes the door by hand */
+  let drawingsHidden = false;
+
+  function applyHiddenState(){
+    const boardEl = document.getElementById('board');
+    const banner = document.getElementById('hiddenBanner');
+    const btn = document.getElementById('hideBtn');
+    if(!boardEl || !btn) return;
+    boardEl.classList.toggle('drawings-hidden', drawingsHidden);
+    btn.textContent = drawingsHidden ? '👁 Show drawings' : '🙈 Hide drawings';
+    btn.classList.toggle('active-hide', drawingsHidden);
+    const anyCards = boardEl.children.length > 0;
+    if(banner) banner.style.display = (drawingsHidden && anyCards) ? 'block' : 'none';
+  }
 
   /* Purging re-reads the board, so only do it when the round changes (right
      after a wipe) and as a slow background sweep after that. */
@@ -1092,17 +1476,39 @@
           <div class="sec-body" id="secBody"></div>
         </details>
         <div class="board-header">
-          <h1>The board</h1>
-          <div class="count" id="countText">0 drawings</div>
+          <div class="board-title-wrap">
+            <h1 id="boardTitle">The board</h1>
+            <span class="count" id="countText">0 drawings</span>
+          </div>
+          <div class="board-actions">
+            <button class="btn secondary small" id="hideBtn">🙈 Hide drawings</button>
+            <button class="btn ghost small" id="switchBoardBtn" style="display:none;">Switch board</button>
+            <button class="btn ghost small" id="signOutBtn2" style="display:none;">Sign out</button>
+          </div>
         </div>
         <div id="board"></div>
+        <div class="hidden-banner" id="hiddenBanner" style="display:none;">Drawings are hidden — press Show drawings for the reveal.</div>
         <div class="empty-state" id="emptyState" style="display:none;">Nothing here yet — scan the QR code to add the first drawing.</div>
       </div>
     `;
 
-    try {
-      new QRCode(document.getElementById('qrcode'), { text: participantUrl(), width: 148, height: 148, colorDark: '#0f1729', colorLight: '#ffffff' });
-    } catch(e){ document.getElementById('qrcode').textContent = participantUrl(); }
+    /* The QR library is deferred, so draw as soon as it turns up and fall back
+       to the plain link if it never does. */
+    function renderQr(){
+      const el = document.getElementById('qrcode');
+      if(!el) return true;
+      if(typeof QRCode === 'undefined'){ el.textContent = participantUrl(); return false; }
+      try{
+        el.textContent = '';
+        new QRCode(el, { text: participantUrl(), width: 148, height: 148, colorDark: '#0f1729', colorLight: '#ffffff' });
+        return true;
+      }catch(e){ el.textContent = participantUrl(); return false; }
+    }
+    if(!renderQr()){
+      window.addEventListener('load', renderQr, { once:true });
+      setTimeout(renderQr, 1500);
+      setTimeout(renderQr, 5000);
+    }
 
     const topicInput = document.getElementById('topicInput');
     const topicHint = document.getElementById('topicHint');
@@ -1176,6 +1582,10 @@
       showToast(clean ? 'All drawings and votes erased from Firebase.' : 'Some data could not be erased — check your connection.');
     });
     document.getElementById('downloadBtn').addEventListener('click', ()=>{
+      if(typeof html2canvas === 'undefined'){
+        showToast('Board capture needs its library — check your connection, or take a screenshot instead.');
+        return;
+      }
       html2canvas(document.querySelector('.host-wrap'), {backgroundColor:'#131a2e', scale:2}).then(canvas=>{
         const link = document.createElement('a');
         link.download = 'topic-drawing-board.png';
@@ -1183,6 +1593,35 @@
         link.click();
       }).catch(()=>{ showToast('Could not capture the board image — try a regular screenshot instead.'); });
     });
+
+    /* Hide the board for a reveal, or to stop guests copying each other. */
+    const hideBtn = document.getElementById('hideBtn');
+    hideBtn.addEventListener('click', ()=>{
+      drawingsHidden = !drawingsHidden;
+      applyHiddenState();
+    });
+
+    if(isSignedInHost()){
+      const switchBtn = document.getElementById('switchBoardBtn');
+      const outBtn = document.getElementById('signOutBtn2');
+      switchBtn.style.display = '';
+      outBtn.style.display = '';
+      switchBtn.addEventListener('click', ()=>{
+        const url = new URL(window.location.href);
+        url.searchParams.delete('b');
+        window.location.href = url.toString();
+      });
+      outBtn.addEventListener('click', ()=>{
+        clearAuth();
+        const url = new URL(window.location.href);
+        url.searchParams.delete('b');
+        window.location.href = url.toString();
+      });
+      getBoardMeta().then(meta=>{
+        const t = document.getElementById('boardTitle');
+        if(meta && meta.name && t) t.textContent = meta.name;
+      });
+    }
 
     const closeBtn = document.getElementById('closeSessionBtn');
     if(AUTH_ENABLED){
@@ -1215,47 +1654,67 @@
     ".read": false,
     ".write": false,
 
-    "session": {
-      ".read": "auth != null",
-      ".write": "auth != null && auth.uid === '__HOST_UID__'"
-    },
-
-    "state": {
-      ".read": "auth != null && (auth.uid === '__HOST_UID__' || root.child('session/openUntil').val() > now)",
-      ".write": "auth != null && auth.uid === '__HOST_UID__'",
-      ".validate": "newData.hasChildren(['phase', 'round'])"
-    },
-
-    "board": {
-      ".read": "auth != null && (auth.uid === '__HOST_UID__' || root.child('session/openUntil').val() > now)",
-      ".write": "auth != null && auth.uid === '__HOST_UID__'",
-      "$drawing": {
-        ".write": "auth != null && !data.exists() && newData.exists() && root.child('session/openUntil').val() > now",
-        ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
-        "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
-        "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
-        "ts":      { ".validate": "newData.isNumber()" },
-        "round":   { ".validate": "newData.isString() && newData.val() === root.child('state/round').val()" },
-        "$other":  { ".validate": false }
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
       }
     },
 
-    "votes": {
-      ".read": "auth != null && (auth.uid === '__HOST_UID__' || root.child('session/openUntil').val() > now)",
-      ".write": "auth != null && auth.uid === '__HOST_UID__'",
-      "$voter": {
-        ".write": "auth != null && $voter === auth.uid && !data.exists() && newData.exists() && root.child('session/openUntil').val() > now",
-        ".validate": "newData.hasChildren(['choice', 'ts', 'round'])",
-        "choice": { ".validate": "newData.isString() && root.child('board').child(newData.val()).exists()" },
-        "ts":     { ".validate": "newData.isNumber()" },
-        "round":  { ".validate": "newData.isString() && newData.val() === root.child('state/round').val()" },
-        "$other": { ".validate": false }
+    "boards": {
+      "$b": {
+        ".read": "auth != null && (root.child('boards').child($b).child('owner').val() === auth.uid || root.child('boards').child($b).child('session/openUntil').val() > now)",
+        ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid",
+
+        "owner": {
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid",
+          ".validate": "newData.isString()"
+        },
+
+        "meta": {
+          ".validate": "newData.hasChildren(['name'])",
+          "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "createdAt": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        },
+
+        "session": {
+          "openUntil": { ".validate": "newData.isNumber()" },
+          "$other":    { ".validate": false }
+        },
+
+        "state": {
+          ".validate": "newData.hasChildren(['phase', 'round'])"
+        },
+
+        "board": {
+          "$drawing": {
+            ".write": "auth != null && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+            ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
+            "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
+            "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
+            "ts":      { ".validate": "newData.isNumber()" },
+            "round":   { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
+            "$other":  { ".validate": false }
+          }
+        },
+
+        "votes": {
+          "$voter": {
+            ".write": "auth != null && $voter === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+            ".validate": "newData.hasChildren(['choice', 'ts', 'round'])",
+            "choice": { ".validate": "newData.isString() && root.child('boards').child($b).child('board').child(newData.val()).exists()" },
+            "ts":     { ".validate": "newData.isNumber()" },
+            "round":  { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
+            "$other": { ".validate": false }
+          }
+        }
       }
     }
   }
 }`;
 
-  function rulesForHost(){ return RULES_TEMPLATE.replace(/__HOST_UID__/g, auth.uid || 'YOUR-HOST-ID'); }
+  function rulesForHost(){ return RULES_TEMPLATE; }
 
   async function renderSecurityPanel(){
     const body = document.getElementById('secBody');
@@ -1265,9 +1724,9 @@
     if(!AUTH_ENABLED){
       body.innerHTML = `
         <p class="sec-lead">This board is running in <strong>test mode</strong>: anyone who has the database URL can read, add or delete drawings, at any time of day.</p>
-        <p class="sec-lead">To lock it down, guests sign in anonymously in the background and the rules only accept their drawings while this board is open. Nothing changes for them — no login, no prompt.</p>
+        <p class="sec-lead">Locking it down also unlocks host accounts and separate boards per presenter. Guests still just scan and draw — no login, no prompt.</p>
         <ol class="sec-steps">
-          <li>In Firebase: <strong>Build → Authentication → Get started → Anonymous → Enable</strong>.</li>
+          <li>In Firebase: <strong>Build → Authentication → Get started</strong>, then enable both <strong>Anonymous</strong> (for guests) and <strong>Email/Password</strong> (for hosts).</li>
           <li>In <strong>Project settings → General</strong>, copy the <strong>Web API key</strong> and paste it below.</li>
           <li>Come back here and copy the database rules into <strong>Realtime Database → Rules</strong>.</li>
         </ol>
@@ -1294,13 +1753,12 @@
     }
 
     body.innerHTML = `
-      <p class="sec-lead">Guests are signed in anonymously and can only add drawings while this board is open. Paste the rules below into <strong>Realtime Database → Rules</strong> in Firebase, then hit Publish.</p>
+      <p class="sec-lead">Guests are signed in anonymously and can only add drawings while <strong>this</strong> board is open. You own this board through your account, so it follows you to any device you present from — and other presenters' boards stay separate from yours.</p>
       <div class="sec-row">
-        <span class="eyebrow">Your host ID</span>
-        <code class="sec-uid" id="secUid">${esc(auth.uid || '')}</code>
-        <button class="btn secondary small" id="copyUidBtn">Copy</button>
+        <span class="eyebrow">Signed in as</span>
+        <code class="sec-uid">${esc(auth.email || auth.uid || '')}</code>
       </div>
-      <p class="sec-note">The rules below already have this ID baked in. It stays the same on this browser — if you host from a different device, copy the rules again from there.</p>
+      <p class="sec-note">These rules are the same for everyone — there is nothing to fill in. Paste them into <strong>Realtime Database → Rules</strong> in Firebase once, and every board in this project is covered.</p>
       <div class="sec-row"><button class="btn small" id="copyRulesBtn">Copy database rules</button></div>
       <pre class="sec-rules" id="secRules">${esc(rulesForHost())}</pre>`;
 
@@ -1309,7 +1767,6 @@
       catch(e){ showToast('Copy failed — select the text manually.'); return; }
       setTimeout(()=>{ btn.textContent = label; }, 2000);
     }
-    document.getElementById('copyUidBtn').addEventListener('click', (e)=> copy(auth.uid || '', e.target, 'Copy'));
     document.getElementById('copyRulesBtn').addEventListener('click', (e)=> copy(rulesForHost(), e.target, 'Copy database rules'));
   }
 
@@ -1388,6 +1845,7 @@
 
     if(submissions.length === 0){
       boardEl.innerHTML = ''; emptyEl.style.display = 'block'; countEl.textContent = '0 drawings';
+      applyHiddenState();
       return;
     }
     emptyEl.style.display = 'none';
@@ -1419,6 +1877,7 @@
         </div>
       `;
     }).join('');
+    applyHiddenState();
   }
 
   /* ================= ROUTER ================= */
@@ -1426,7 +1885,7 @@
     if(isHost){ renderSetup(); }
     else { app.innerHTML = '<div class="setup-wrap"><div class="setup-card"><h2>Ask your host for the QR code</h2><p class="sub">This link is missing its board address.</p></div></div>'; }
   } else if(isHost){
-    renderHostView();
+    startHost();
   } else {
     renderDrawShell();
     drawPollLoop();
