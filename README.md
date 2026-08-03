@@ -10,6 +10,46 @@ Open `index.html?host=1` and follow the one-time setup to connect a free
 Firebase Realtime Database. The board is at `?host=1&db=…`; the QR code points
 guests at the same page without `host=1`.
 
+## Sharing one deployment (recommended)
+
+By default the database URL and API key travel in the URL, so every host needs
+their own Firebase project and the links get very long. Fill in the `BUILT_IN`
+block at the top of the script in `index.html` instead:
+
+```js
+const BUILT_IN = {
+  dbUrl:  'https://yourproject-default-rtdb.firebaseio.com',
+  apiKey: 'AIzaSy…'
+};
+```
+
+Now nobody else needs a Firebase project, an API key or any setup at all — they
+open your link, create an account and make a board. Links shrink to:
+
+```
+…/index.html?host=1          the host — sign in, pick or make a board
+…/index.html?b=4FDY8R        a guest joining that board
+```
+
+Both values are public by design: they ship in the source of every Firebase web
+app and identify the project without granting access. `firebase-rules.json` is
+what protects the data, and it already keeps each presenter's boards separate.
+
+A value in the URL still overrides the built-in one, so anyone who prefers their
+own backend can keep using `?db=…&key=…`.
+
+**It is your quota.** Everyone using your copy stores their drawings in your
+Firebase project. The free Spark plan allows 1 GB stored and 10 GB/month of
+downloads, and drawings are deleted at the end of each round, so ordinary use is
+comfortable — but it is your project's allowance they are spending.
+
+### Board codes
+
+Boards get a six-character code like `4FDY8R`, drawn from an alphabet with no
+`0/O` or `1/I/L` so it cannot be misread. It appears under the QR code on the
+board, and guests who cannot scan can open the bare link and type it in. Codes
+are accepted in any case.
+
 ## Two security modes
 
 ### Test mode (default)

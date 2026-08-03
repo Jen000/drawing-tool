@@ -213,6 +213,21 @@
   }
   #qrcode img, #qrcode canvas{display:block;}
   .qr-box .hint{font-size:12px;color:rgba(238,241,248,.55);margin-top:10px;max-width:170px;line-height:1.45;}
+  .join-hint{font-size:12px;color:rgba(238,241,248,.55);margin-top:10px;max-width:180px;line-height:1.5;text-align:center;}
+  .join-or{font-size:11px;color:rgba(238,241,248,.45);}
+  .join-where{font-size:12.5px;color:rgba(238,241,248,.8);word-break:break-all;margin:2px 0 4px;font-weight:500;}
+  .join-code{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:22px;font-weight:700;
+    letter-spacing:.14em;color:#fff;margin-top:3px;
+  }
+
+  .join-card{text-align:center;}
+  .join-card h2{margin-bottom:6px;}
+  .join-input{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:30px;letter-spacing:.22em;text-align:center;text-transform:uppercase;
+    margin-top:18px;padding:16px 12px;
+  }
 
   .control-panel{padding:20px 22px;}
   .control-panel .eyebrow{color:rgba(238,241,248,.6);}
@@ -390,11 +405,36 @@
 
 <script>
 (function(){
+  /* ===================== DEPLOYMENT CONFIG =====================
+     Fill these two in once and everyone who uses your copy needs no Firebase
+     project, no API key and no setup — they just sign in and make a board.
+     It also shortens every link, because these stop travelling in the URL.
+
+       dbUrl  — Realtime Database URL   (Firebase → Realtime Database)
+       apiKey — Web API key, "AIza…"    (Project settings → General → Your apps)
+
+     Both values are public by design: they ship in the source of every Firebase
+     web app and identify the project without granting any access. The database
+     rules in firebase-rules.json are what actually protect the data.
+
+     Leave them blank to keep the old behaviour, where each host supplies their
+     own ?db=…&key=… in the URL. A value in the URL always wins over these.
+     ============================================================ */
+  const BUILT_IN = {
+    dbUrl:  '',
+    apiKey: ''
+  };
+
   const params = new URLSearchParams(window.location.search);
   const isHost = params.get('host') === '1';
-  const dbUrl = params.get('db');
-  const apiKey = params.get('key');          /* present => accounts + locked down */
-  const boardId = params.get('b');           /* which presenter's board this is */
+  const dbUrl = params.get('db') || BUILT_IN.dbUrl || '';
+  const apiKey = params.get('key') || BUILT_IN.apiKey || '';
+
+  /* Board codes are short and typed by humans, so accept any case. Older
+     long-form ids are left exactly as they are. */
+  const rawBoard = (params.get('b') || '').trim();
+  const boardId = rawBoard.length && rawBoard.length <= 8 ? rawBoard.toUpperCase() : rawBoard;
+
   const app = document.getElementById('app');
   const POLL_MS = 4000;
 
@@ -608,7 +648,20 @@
 
   /* ---------- boards: one per presenter, so several people can run their own
      night off the same deployment without touching each other's drawings ---- */
-  function newBoardId(){ return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+  /* Short enough to read off a slide, and no characters that get misread:
+     no 0/O, no 1/I/L. 31^6 ≈ 887 million combinations. */
+  const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
+  const CODE_LENGTH = 6;
+  function newBoardCode(){
+    let out = '';
+    const buf = new Uint32Array(CODE_LENGTH);
+    (window.crypto || window.msCrypto).getRandomValues(buf);
+    for(let i=0;i<CODE_LENGTH;i++) out += CODE_ALPHABET[buf[i] % CODE_ALPHABET.length];
+    return out;
+  }
+  function looksLikeCode(s){
+    return new RegExp('^[' + CODE_ALPHABET + ']{' + CODE_LENGTH + '}$').test(String(s || '').toUpperCase());
+  }
 
   async function listMyBoards(){
     if(!auth.uid) return [];
@@ -618,11 +671,18 @@
       .sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   }
   async function createBoard(name){
-    const id = newBoardId();
     const createdAt = Date.now();
     const clean = (name || '').trim() || 'Untitled board';
-    /* Claim it first — the rules only accept an owner while there isn't one. */
-    if(!(await dbPut('boards/' + id + '/owner', auth.uid))) return null;
+    /* Claim a free code. The rules only accept an owner while there isn't one,
+       so a collision fails the write and we simply try another code. */
+    let id = null;
+    for(let attempt = 0; attempt < 6; attempt++){
+      const candidate = newBoardCode();
+      const existing = await dbGet('boards/' + candidate + '/owner');
+      if(existing && typeof existing === 'string') continue;
+      if(await dbPut('boards/' + candidate + '/owner', auth.uid)){ id = candidate; break; }
+    }
+    if(!id) return null;
     await dbPut('boards/' + id + '/meta', { name: clean, createdAt });
     await dbPut('boards/' + id + '/state', { ...DEFAULT_STATE, round: 'r' + createdAt, roundStartedAt: createdAt });
     await dbPut('users/' + auth.uid + '/boards/' + id, { name: clean, createdAt });
@@ -1434,7 +1494,7 @@
               <div class="eyebrow">Scan to draw</div>
               <div id="qrcode"></div>
             </div>
-            <div class="hint">No app, no login — opens straight to the canvas.</div>
+            <div class="join-hint" id="joinHint"></div>
           </div>
           <div class="control-panel glass">
             <label class="eyebrow" for="topicInput">Topic</label>
@@ -1509,6 +1569,20 @@
       window.addEventListener('load', renderQr, { once:true });
       setTimeout(renderQr, 1500);
       setTimeout(renderQr, 5000);
+    }
+
+    /* Read-it-off-the-screen fallback for anyone whose camera won't cooperate. */
+    const joinHint = document.getElementById('joinHint');
+    if(joinHint){
+      if(looksLikeCode(boardId)){
+        const short = window.location.origin + window.location.pathname;
+        joinHint.innerHTML = `<div class="join-or">or go to</div>
+          <div class="join-where">${esc(short.replace(/^https?:\/\//, '').replace(/index\.html$/, ''))}</div>
+          <div class="join-or">and enter code</div>
+          <div class="join-code">${esc(boardId)}</div>`;
+      } else {
+        joinHint.textContent = 'No app, no login — opens straight to the canvas.';
+      }
     }
 
     const topicInput = document.getElementById('topicInput');
@@ -1883,12 +1957,48 @@
     applyHiddenState();
   }
 
+  /* Guests who typed the address instead of scanning: let them in with the
+     code from the screen. */
+  function renderJoinScreen(){
+    app.innerHTML = `
+      <div class="setup-wrap">
+        <div class="setup-card join-card">
+          <h2>Join a drawing board</h2>
+          <p class="sub">Enter the code shown on the presenter's screen, or scan their QR code.</p>
+          <input id="joinCode" class="field join-input" type="text" inputmode="latin"
+                 autocapitalize="characters" autocomplete="off" spellcheck="false"
+                 maxlength="${CODE_LENGTH}" placeholder="${'ABC123'}" aria-label="Board code">
+          <div class="err" id="joinErr"></div>
+          <div style="margin-top:16px;"><button class="btn" id="joinBtn">Join</button></div>
+        </div>
+      </div>`;
+    const input = document.getElementById('joinCode');
+    const err = document.getElementById('joinErr');
+    input.addEventListener('input', ()=>{
+      input.value = input.value.toUpperCase().replace(new RegExp('[^' + CODE_ALPHABET + ']', 'g'), '');
+      err.textContent = '';
+    });
+    function join(){
+      const code = input.value.trim().toUpperCase();
+      if(!looksLikeCode(code)){ err.textContent = `Codes are ${CODE_LENGTH} characters, like ABC123.`; return; }
+      const url = new URL(window.location.href);
+      url.searchParams.set('b', code);
+      window.location.href = url.toString();
+    }
+    document.getElementById('joinBtn').addEventListener('click', join);
+    input.addEventListener('keydown', e=>{ if(e.key === 'Enter') join(); });
+    input.focus();
+  }
+
   /* ================= ROUTER ================= */
   if(!dbUrl){
     if(isHost){ renderSetup(); }
     else { app.innerHTML = '<div class="setup-wrap"><div class="setup-card"><h2>Ask your host for the QR code</h2><p class="sub">This link is missing its board address.</p></div></div>'; }
   } else if(isHost){
     startHost();
+  } else if(!boardId && BUILT_IN.dbUrl){
+    /* Shared deployment: no board in the link means they need a code. */
+    renderJoinScreen();
   } else {
     renderDrawShell();
     drawPollLoop();
