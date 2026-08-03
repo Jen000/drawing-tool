@@ -10,6 +10,46 @@ Open `index.html?host=1` and follow the one-time setup to connect a free
 Firebase Realtime Database. The board is at `?host=1&db=…`; the QR code points
 guests at the same page without `host=1`.
 
+## Sharing one deployment (recommended)
+
+By default the database URL and API key travel in the URL, so every host needs
+their own Firebase project and the links get very long. Fill in the `BUILT_IN`
+block at the top of the script in `index.html` instead:
+
+```js
+const BUILT_IN = {
+  dbUrl:  'https://yourproject-default-rtdb.firebaseio.com',
+  apiKey: 'AIzaSy…'
+};
+```
+
+Now nobody else needs a Firebase project, an API key or any setup at all — they
+open your link, create an account and make a board. Links shrink to:
+
+```
+…/index.html?host=1          the host — sign in, pick or make a board
+…/index.html?b=4FDY8R        a guest joining that board
+```
+
+Both values are public by design: they ship in the source of every Firebase web
+app and identify the project without granting access. `firebase-rules.json` is
+what protects the data, and it already keeps each presenter's boards separate.
+
+A value in the URL still overrides the built-in one, so anyone who prefers their
+own backend can keep using `?db=…&key=…`.
+
+**It is your quota.** Everyone using your copy stores their drawings in your
+Firebase project. The free Spark plan allows 1 GB stored and 10 GB/month of
+downloads, and drawings are deleted at the end of each round, so ordinary use is
+comfortable — but it is your project's allowance they are spending.
+
+### Board codes
+
+Boards get a six-character code like `4FDY8R`, drawn from an alphabet with no
+`0/O` or `1/I/L` so it cannot be misread. It appears under the QR code on the
+board, and guests who cannot scan can open the bare link and type it in. Codes
+are accepted in any case.
+
 ## Two security modes
 
 ### Test mode (default)
@@ -25,19 +65,44 @@ they are signed in anonymously, and the rules only accept their drawings while
 your board is actually open. Hosts sign in with an email and password, which is
 what lets several presenters share one deployment.
 
-1. Firebase → **Build → Authentication → Get started**, and enable **both**
-   sign-in providers: **Anonymous** (guests) and **Email/Password** (hosts).
-2. Firebase → **Project settings → General → Your apps**. If there is no app
-   yet, click the web icon `</>`, give it any nickname and skip Hosting —
-   until a web app is registered there is no Web API key to copy. Firebase then
-   shows a `firebaseConfig` snippet; the key is the `apiKey` value, starting
-   with `AIza`. (It also appears as **Web API Key** on that page once an app
-   exists, and in Google Cloud Console → APIs & Services → Credentials.)
-3. Open the board with `?host=1&db=…`, expand **Security & access**, paste the
-   key, and press *Turn on locked-down mode*. The URL gains a `&key=…`
-   parameter — use that URL from now on.
-4. Paste `firebase-rules.json` into **Realtime Database → Rules** and press
+Do these in order. Publishing the rules **last** matters: the moment they are
+live, anything without a signed-in host is refused, so a page still running on
+the old URL would lock itself out.
+
+**In the Firebase console first**
+
+1. **Build → Authentication → Get started**, and enable **both** sign-in
+   providers: **Anonymous** (guests) and **Email/Password** (hosts). Without
+   this you cannot create a host account in step 3.
+2. **Project settings → General → Your apps**. If there is no app yet, click
+   the web icon `</>`, give it any nickname and skip Hosting — until a web app
+   is registered there is no Web API key to copy. Firebase then shows a
+   `firebaseConfig` snippet; the key is the `apiKey` value, starting with
+   `AIza`. (It also appears as **Web API Key** on that page once an app exists,
+   and in Google Cloud Console → APIs & Services → Credentials.)
+
+**Then one pass through the app** — steps 3 to 5 are screens it shows you in
+sequence, not places to navigate to.
+
+3. Add `&key=AIza…` to your host URL and load it:
+   `…/index.html?host=1&db=https://YOURPROJECT-default-rtdb.firebaseio.com&key=AIza…`
+   (The **Security & access** panel on an existing board has a field that
+   builds this same URL for you — either way is fine.)
+4. A **sign-in screen** appears. Choose *Create an account* and pick any email
+   and a password of at least six characters. This is the host account; guests
+   never see it.
+5. A **Your boards** screen appears, empty. Name a board and create it. It
+   opens, and the URL now ends with `&b=…`. Bookmark that URL — it is your host
+   link, and its QR code is what guests scan.
+
+**Back in Firebase, last**
+
+6. Paste `firebase-rules.json` into **Realtime Database → Rules** and press
    Publish. The rules are the same for everyone; there is nothing to fill in.
+
+A note on the word *board*. Before you lock down there is one shared board and
+"your board" just means the host page. Afterwards a board is a named thing you
+create and own, identified by `&b=…` in the URL, and you can have several.
 
 ## Multiple presenters
 
