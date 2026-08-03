@@ -239,6 +239,12 @@
     padding:1px 7px;border-radius:6px;letter-spacing:.06em;margin-right:8px;
   }
 
+  .access-id{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;
+    background:var(--surface-2);border:1px solid var(--line);padding:8px 12px;
+    border-radius:8px;word-break:break-all;flex:1 1 200px;
+  }
+
   .help-overlay{
     position:fixed;inset:0;z-index:950;display:flex;align-items:center;justify-content:center;
     padding:20px;background:rgba(8,12,25,.62);backdrop-filter:blur(4px);overflow-y:auto;
@@ -1383,10 +1389,64 @@
       const id = await createBoard(document.getElementById('newBoardName').value);
       if(!id){
         btn.disabled = false; btn.textContent = 'Create board';
+        if(writeDenied){ renderAccessNeeded(); return; }
         showToast('Could not create the board — check the database rules are published.');
         return;
       }
       window.location.href = boardUrl(id);
+    });
+  }
+
+  /* Owners can restrict who may host by adding uids under /hosts. When that is
+     on, a stranger's first board creation is refused — say so plainly and give
+     them the one thing the owner needs, rather than a generic failure. */
+  function renderAccessNeeded(){
+    const uid = auth.uid || '';
+    app.innerHTML = `
+      <div class="setup-wrap">
+        <div class="setup-card">
+          <h2>Almost there</h2>
+          <p class="sub">This copy is invite-only, so hosting has to be switched on for your account. Playing is unaffected — anyone with a code can still join a board.</p>
+
+          <div class="landing-block" style="margin-top:18px;">
+            <div class="landing-label">Send the owner this ID</div>
+            <p class="landing-hint">It is just an account identifier — it carries nothing personal.</p>
+            <div class="sec-row">
+              <code class="access-id" id="accessId">${esc(uid)}</code>
+              <button class="btn secondary small" id="copyAccessId">Copy</button>
+            </div>
+          </div>
+
+          <div class="landing-split"><span>or</span></div>
+
+          <div class="landing-block">
+            <div class="landing-label">Run your own copy</div>
+            <p class="landing-hint">The game is one file and a free database. Then it is your backend, with no waiting on anyone.</p>
+            ${BUILT_IN.docsUrl
+              ? `<a class="btn secondary landing-go" href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">Read the setup guide</a>`
+              : `<p class="landing-hint" style="margin:0;">See <code>docs/setup.md</code> in the project.</p>`}
+          </div>
+
+          <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn ghost small" id="accessRetry">Try again</button>
+            <button class="btn ghost small" id="accessSignOut">Sign out</button>
+          </div>
+        </div>
+      </div>`;
+
+    document.getElementById('copyAccessId').addEventListener('click', async (e)=>{
+      try{
+        await navigator.clipboard.writeText(uid);
+        e.target.textContent = 'Copied ✓';
+        setTimeout(()=>{ e.target.textContent = 'Copy'; }, 2000);
+      }catch(err){ showToast('Copy failed — select the ID and copy it by hand.'); }
+    });
+    document.getElementById('accessRetry').addEventListener('click', ()=> renderBoardPicker());
+    document.getElementById('accessSignOut').addEventListener('click', ()=>{
+      clearAuth();
+      const url = new URL(window.location.href);
+      url.searchParams.delete('b'); url.searchParams.delete('host');
+      window.location.href = url.toString();
     });
   }
 
@@ -2447,6 +2507,12 @@
     ".read": false,
     ".write": false,
 
+    "hosts": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -2460,7 +2526,7 @@
         ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid",
 
         "owner": {
-          ".write": "auth != null && !data.exists() && newData.val() === auth.uid",
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid && (!root.child('hosts').exists() || root.child('hosts').child(auth.uid).exists())",
           ".validate": "newData.isString()"
         },
 

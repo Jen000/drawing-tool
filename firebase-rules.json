@@ -3,6 +3,12 @@
     ".read": false,
     ".write": false,
 
+    "hosts": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -16,7 +22,7 @@
         ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid",
 
         "owner": {
-          ".write": "auth != null && !data.exists() && newData.val() === auth.uid",
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid && (!root.child('hosts').exists() || root.child('hosts').child(auth.uid).exists())",
           ".validate": "newData.isString()"
         },
 
