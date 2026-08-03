@@ -187,19 +187,24 @@ not by obscurity.
 
 ## Deploying with the config injected
 
-`.github/workflows/deploy.yml` builds the page with the config filled in from
-repository variables, so you do not commit them. Set these under
-**Settings → Secrets and variables → Actions → Variables**:
+`.github/workflows/deploy.yml` builds the page with the config filled in at
+deploy time, so you do not commit it. Set these under **Settings → Secrets and
+variables → Actions** — **Secrets and Variables both work**, and either naming
+is accepted:
 
-| Variable | Value |
+| Name | Value |
 |---|---|
-| `FIREBASE_DB_URL` | `https://yourproject-default-rtdb.firebaseio.com` |
-| `FIREBASE_API_KEY` | `AIzaSy…` |
+| `DB_URL` or `FIREBASE_DB_URL` | `https://yourproject-default-rtdb.firebaseio.com` |
+| `API_KEY` or `FIREBASE_API_KEY` | `AIzaSy…` |
 | `DOCS_URL` | optional, a link shown in the app's Help |
 
 Then set **Settings → Pages → Source → GitHub Actions**. Every push to `main`
-redeploys. The workflow fails loudly if the variables are missing rather than
+redeploys. The workflow fails loudly if the values are missing rather than
 publishing a broken page.
+
+Storing them as Secrets is harmless and masks them in the build log, but that
+masking is cosmetic — see the note above. It does mean the log will show `***`
+instead of your database URL, which is worth knowing when a deploy misbehaves.
 
 ## Letting people bring their own database
 

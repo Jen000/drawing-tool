@@ -1,21 +1,21 @@
-# Publishes the game to GitHub Pages, filling in the Firebase config from
-# repository variables so the values are not committed to the source.
+# Publishes the game to GitHub Pages, filling in the Firebase config at build
+# time so the values are not committed to the source.
+#
+# Set these under Settings → Secrets and variables → Actions. Secrets and
+# Variables both work, and either naming is accepted:
+#   DB_URL   or FIREBASE_DB_URL    https://yourproject-default-rtdb.firebaseio.com
+#   API_KEY  or FIREBASE_API_KEY   AIzaSy…
+#   DOCS_URL                       (optional) link shown in the app's Help panel
 #
 # IMPORTANT — this keeps the values out of the repository, NOT out of the
-# published page. The browser has to know them to reach Firebase at all, so
-# they end up in the HTML that Pages serves and anyone can read them with View
+# published page. The browser has to know them to reach Firebase at all, so they
+# end up in the HTML that Pages serves and anyone can read them with View
 # Source. That is fine and expected: these values identify a project, they do
-# not grant access to it. What actually decides who can host is the /hosts
-# allowlist in firebase-rules.json. See docs/setup.md.
+# not grant access to it. What decides who can host is the /hosts allowlist in
+# firebase-rules.json. See docs/setup.md.
 #
-# Set these under Settings → Secrets and variables → Actions → Variables:
-#   FIREBASE_DB_URL   https://yourproject-default-rtdb.firebaseio.com
-#   FIREBASE_API_KEY  AIzaSy…
-#   DOCS_URL          (optional) link shown in the app's Help panel
-#
-# They are Variables rather than Secrets on purpose: Actions masks secrets in
-# logs, which only obscures values that are public anyway, and a masked value
-# is harder to debug when a deploy goes wrong.
+# Storing them as Secrets is harmless — it masks them in build logs, which is
+# only cosmetic here — but do not mistake that masking for protection.
 
 name: Deploy to Pages
 
@@ -37,17 +37,18 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Inject Firebase config
         env:
-          DB_URL: ${{ vars.FIREBASE_DB_URL }}
-          API_KEY: ${{ vars.FIREBASE_API_KEY }}
-          DOCS_URL: ${{ vars.DOCS_URL }}
+          # Secrets or variables, under either naming — whichever you set is used.
+          DB_URL:   ${{ secrets.DB_URL   || secrets.FIREBASE_DB_URL   || vars.DB_URL   || vars.FIREBASE_DB_URL }}
+          API_KEY:  ${{ secrets.API_KEY  || secrets.FIREBASE_API_KEY  || vars.API_KEY  || vars.FIREBASE_API_KEY }}
+          DOCS_URL: ${{ secrets.DOCS_URL || vars.DOCS_URL }}
         run: |
           if [ -z "$DB_URL" ] || [ -z "$API_KEY" ]; then
-            echo "::error::FIREBASE_DB_URL and FIREBASE_API_KEY must be set as repository variables."
-            echo "Settings → Secrets and variables → Actions → Variables"
+            echo "::error::Set DB_URL and API_KEY under Settings → Secrets and variables → Actions."
+            echo "Either Secrets or Variables works; FIREBASE_DB_URL / FIREBASE_API_KEY are accepted too."
             exit 1
           fi
 
@@ -70,7 +71,7 @@ jobs:
               "  };"
           )
           open('index.html', 'w', encoding='utf-8').write(html[:block.start()] + replacement + html[block.end():])
-          print("Injected config for", os.environ['DB_URL'])
+          print("Injected Firebase config into index.html")
           PY
 
       - name: Check it actually landed
