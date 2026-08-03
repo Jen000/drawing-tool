@@ -7,6 +7,9 @@
         ".read": "auth != null && auth.uid === $uid"
       }
     },
+    "hostingGate": {
+      ".read": "root.child('hosts').exists()"
+    },
     "codes": {
       "$code": {
         ".write": "auth != null && data.exists() && !data.child('claimedBy').exists() && newData.child('claimedBy').val() === auth.uid",

@@ -617,6 +617,10 @@
   const usingOwnBackend = !!(backend && backend.dbUrl && !params.get('db') && !joiningPlainLink);
   const dbUrl = params.get('db') || (!joiningPlainLink && backend && backend.dbUrl) || BUILT_IN.dbUrl || '';
   const apiKey = params.get('key') || (!joiningPlainLink && backend && backend.apiKey) || BUILT_IN.apiKey || '';
+  /* Trials, codes and the host allowlist belong to the copy this page was
+     deployed as. On somebody else's database none of it applies, so none of it
+     should be asked about either. */
+  const onSharedBackend = !usingOwnBackend && !params.get('db');
 
   const app = document.getElementById('app');
   const POLL_MS = 4000;
@@ -889,6 +893,22 @@
     myGrant = (grant && grant.expiresAt) ? grant : null;
     return myGrant;
   }
+  /* Whether this deployment restricts hosting at all. /hosts itself is not
+     readable — hostingGate holds nothing and exists only so that reading it
+     succeeds exactly when /hosts has entries, which answers the question
+     without exposing who is on the list. */
+  let hostingGateCache = null;
+  async function isHostingGated(){
+    if(!onSharedBackend) return false;
+    if(hostingGateCache !== null) return hostingGateCache;
+    try{
+      const res = await fetch(await nodeUrl('hostingGate'));
+      noteServerTime(res);
+      hostingGateCache = !isDenied(res);
+    }catch(e){ hostingGateCache = false; }
+    return hostingGateCache;
+  }
+
   function grantLive(g){ return !!(g && g.expiresAt > serverNow()); }
   function boardsLeft(g){ return g ? Math.max(0, (g.boardsMax || 0) - (g.boardsUsed || 0)) : 0; }
   function imagesLeft(g){ return g ? Math.max(0, (g.imagesMax || 0) - (g.imagesUsed || 0)) : 0; }
@@ -1375,6 +1395,44 @@
   }
 
   /* ================= HOST SIGN-IN ================= */
+  /* On a deployment that limits hosting, an account is only worth creating on
+     *this* database if the trial is what you came for. Anyone bringing their
+     own Firebase should be sent there before signing up, so their account is
+     created in their project rather than leaving a stray one in ours. */
+  function renderSignupChoice(onTrial, onHaveAccount){
+    app.innerHTML = `
+      <div class="setup-wrap">
+        <div class="setup-card">
+          <h2>Create a host account</h2>
+          <p class="sub">Two ways to run games. Pick one and your account is made there.</p>
+
+          <div class="landing-block" style="margin-top:18px;">
+            <div class="landing-label">Start with a free week</div>
+            <p class="landing-hint">Hosting on this copy's database: 6 boards and 90 drawings for a week. You will need an access code from whoever runs it.</p>
+            <button class="btn landing-go" id="chooseTrial">Start a free trial</button>
+          </div>
+
+          <div class="landing-split"><span>or</span></div>
+
+          <div class="landing-block">
+            <div class="landing-label">Bring your own Firebase</div>
+            <p class="landing-hint">Your own free project, no limits and no code needed. Takes about fifteen minutes to set up.</p>
+            <button class="btn secondary landing-go" id="chooseOwn">Use my own Firebase</button>
+            ${BUILT_IN.docsUrl
+              ? `<p class="landing-hint" style="margin:8px 0 0;"><a href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">How to set one up</a></p>`
+              : `<p class="landing-hint" style="margin:8px 0 0;">See <code>docs/setup.md</code> for how.</p>`}
+          </div>
+
+          <div style="margin-top:22px;">
+            <button class="btn ghost small" id="chooseHaveAccount">I already have an account</button>
+          </div>
+        </div>
+      </div>`;
+    document.getElementById('chooseTrial').addEventListener('click', onTrial);
+    document.getElementById('chooseOwn').addEventListener('click', renderSettings);
+    document.getElementById('chooseHaveAccount').addEventListener('click', onHaveAccount);
+  }
+
   function renderHostAuth(){
     let mode = 'signin';
     function paint(){
@@ -1420,7 +1478,15 @@
       }
       document.getElementById('authGo').addEventListener('click', submit);
       passEl.addEventListener('keydown', e=>{ if(e.key === 'Enter') submit(); });
-      document.getElementById('authSwap').addEventListener('click', ()=>{ mode = isNew ? 'signin' : 'signup'; paint(); });
+      document.getElementById('authSwap').addEventListener('click', async ()=>{
+        if(isNew){ mode = 'signin'; paint(); return; }
+        /* Nothing to choose between where hosting is not limited. */
+        if(await isHostingGated()){
+          renderSignupChoice(()=>{ mode = 'signup'; paint(); }, ()=>{ mode = 'signin'; paint(); });
+          return;
+        }
+        mode = 'signup'; paint();
+      });
       const resetBtn = document.getElementById('authReset');
       if(resetBtn){
         resetBtn.addEventListener('click', async ()=>{
@@ -1695,9 +1761,11 @@
     if(!isSignedInHost()){ renderHostAuth(); return; }
 
     await loadAllowance();
-    /* No allowance at all is only a wall where one is being enforced; an
-       unrestricted deployment has neither hosts nor codes and never gets here. */
     if(!iAmUnlimited && myGrant && !grantLive(myGrant)){ renderClaimScreen({ expired:true }); return; }
+    /* No allowance at all is only a wall where one is being enforced, so ask
+       first. Finding out by way of a refused Create board was the whole
+       problem: it reads as a broken sign-in rather than a missing code. */
+    if(!iAmUnlimited && !myGrant && await isHostingGated()){ renderClaimScreen(); return; }
 
     if(!boardId){ renderBoardPicker(); return; }
     renderHostView();
@@ -2806,6 +2874,9 @@
       "$uid": {
         ".read": "auth != null && auth.uid === $uid"
       }
+    },
+    "hostingGate": {
+      ".read": "root.child('hosts').exists()"
     },
     "codes": {
       "$code": {

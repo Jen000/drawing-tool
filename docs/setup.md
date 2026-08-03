@@ -164,10 +164,14 @@ The rule is opt-in: while `/hosts` does not exist, anybody may host, exactly as
 before. The moment it has one entry, only the accounts listed can create boards
 — so **add your own ID first**, or you will lock yourself out.
 
-To find an ID: sign in on the site and try to create a board. You will be told
-hosting is not switched on for your account, and shown your ID with a copy
-button. That is the string to paste. Anyone asking for access can send you
-theirs the same way.
+To find an ID: sign in on the site. An account with no access is told so
+straight away and shown its ID with a copy button. That is the string to paste.
+Anyone asking for access can send you theirs the same way.
+
+Once the list has an entry, **Create an account** also starts asking newcomers
+whether they want a week on your database or would rather use their own
+Firebase — so people setting up their own copy stop leaving unused accounts in
+your project. See [Trial access](trial-access.md).
 
 Playing is never affected. Guests join boards with a code as usual.
 
