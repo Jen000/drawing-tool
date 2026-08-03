@@ -201,6 +201,13 @@ Then set **Settings → Pages → Source → GitHub Actions**. Every push to `ma
 redeploys. The workflow fails loudly if the variables are missing rather than
 publishing a broken page.
 
+## Letting people bring their own database
+
+Anyone can point the app at their own Firebase from **Settings**, reached from
+the board list or at `?settings=1`. It is stored on their device only, and while
+it is set, none of your limits apply — it is their database and their allowance.
+A URL with `?db=…&key=…` still overrides it, for one-off links.
+
 ## Other things worth knowing
 
 **Anyone holding a board code can read that board while it is open.** Codes only

@@ -88,7 +88,8 @@ when boards are running out — on the board and in the board list, so a week
 never lapses mid-event without notice. Running out of boards says so plainly
 rather than failing silently.
 
-## Still to build
+## Bringing your own
 
-A settings screen for pasting your own Firebase details, replacing the current
-`?db=&key=` URL parameters.
+**Settings**, from the board list or `?settings=1`, takes a database URL and API
+key and stores them on that device. From then on the app talks to that project
+instead, so no code, allowance or limit applies. Reverting is one button.

@@ -247,6 +247,13 @@
   .host-wrap .allowance-bar{background:rgba(245,165,36,.16);color:#f7c46c;border-color:rgba(245,165,36,.32);}
   .host-wrap .allowance-bar.bad{background:rgba(229,72,77,.16);color:#ff9b97;border-color:rgba(229,72,77,.35);}
   .allowance-summary{font-size:12.5px;color:var(--ink-soft);margin-bottom:12px;}
+  .settings-now{margin:16px 0 20px;padding:12px 14px;background:var(--surface-2);border-radius:12px;}
+  .settings-host{font-weight:600;font-size:14px;margin-top:4px;word-break:break-all;}
+  .settings-tag{
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+    background:var(--accent);color:#fff;padding:2px 7px;border-radius:999px;margin-left:6px;
+  }
+  .settings-tag.shared{background:var(--ink-soft);}
   .access-id{
     font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;
     background:var(--surface-2);border:1px solid var(--line);padding:8px 12px;
@@ -568,8 +575,25 @@
 
   const params = new URLSearchParams(window.location.search);
   const isHost = params.get('host') === '1';
-  const dbUrl = params.get('db') || BUILT_IN.dbUrl || '';
-  const apiKey = params.get('key') || BUILT_IN.apiKey || '';
+
+  /* Someone can point this copy at their own Firebase from Settings; it is kept
+     on their device only. A URL parameter still wins, for one-off links. */
+  const BACKEND_KEY = 'drawTopicBackend';
+  function savedBackend(){
+    try{ return JSON.parse(localStorage.getItem(BACKEND_KEY) || 'null') || null; }
+    catch(e){ return null; }
+  }
+  function saveBackend(cfg){
+    try{
+      if(cfg) localStorage.setItem(BACKEND_KEY, JSON.stringify(cfg));
+      else localStorage.removeItem(BACKEND_KEY);
+      return true;
+    }catch(e){ return false; }
+  }
+  const backend = savedBackend();
+  const usingOwnBackend = !!(backend && backend.dbUrl && !params.get('db'));
+  const dbUrl = params.get('db') || (backend && backend.dbUrl) || BUILT_IN.dbUrl || '';
+  const apiKey = params.get('key') || (backend && backend.apiKey) || BUILT_IN.apiKey || '';
 
   /* Board codes are short and typed by humans, so accept any case. Older
      long-form ids are left exactly as they are. */
@@ -1386,6 +1410,7 @@
               <p class="sub" style="margin:0;">Signed in as ${esc(auth.email || '')}</p>
             </div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn ghost small" id="pickerSettingsBtn">Settings</button>
               <button class="btn ghost small" id="pickerHelpBtn">Help</button>
               <button class="btn ghost small" id="signOutBtn">Sign out</button>
             </div>
@@ -1401,6 +1426,7 @@
         </div>
       </div>`;
 
+    document.getElementById('pickerSettingsBtn').addEventListener('click', renderSettings);
     document.getElementById('pickerHelpBtn').addEventListener('click', openHelp);
     document.getElementById('signOutBtn').addEventListener('click', ()=>{
       clearAuth();
@@ -1511,9 +1537,10 @@
           <div class="landing-block" style="margin-top:18px;">
             <div class="landing-label">Or run your own copy</div>
             <p class="landing-hint">Your own free database, no limits, no waiting on anyone.</p>
+            <button class="btn secondary landing-go" id="useOwnBackend">Use my own Firebase</button>
             ${BUILT_IN.docsUrl
-              ? `<a class="btn secondary landing-go" href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">Read the setup guide</a>`
-              : `<p class="landing-hint" style="margin:0;">See <code>docs/setup.md</code> in the project.</p>`}
+              ? `<p class="landing-hint" style="margin:8px 0 0;"><a href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">How to set one up</a></p>`
+              : `<p class="landing-hint" style="margin:8px 0 0;">See <code>docs/setup.md</code> for how.</p>`}
           </div>
 
           <div style="margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;">
@@ -1551,6 +1578,7 @@
         setTimeout(()=>{ e.target.textContent = 'Copy'; }, 2000);
       }catch(err){ showToast('Copy failed — select the ID and copy it by hand.'); }
     });
+    document.getElementById('useOwnBackend').addEventListener('click', renderSettings);
     document.getElementById('accessRetry').addEventListener('click', async ()=>{ await loadAllowance(); startHost(); });
     document.getElementById('accessSignOut').addEventListener('click', ()=>{
       clearAuth();
@@ -1558,6 +1586,66 @@
       url.searchParams.delete('b'); url.searchParams.delete('host');
       window.location.href = url.toString();
     });
+  }
+
+  /* Pasting your own Firebase here turns every limit off, because it is then
+     your database and your allowance. */
+  function renderSettings(){
+    const current = savedBackend();
+    const host = (u)=>{ try{ return new URL(u).host; }catch(e){ return u || ''; } };
+    app.innerHTML = `
+      <div class="setup-wrap">
+        <div class="setup-card">
+          <h2>Your own database</h2>
+          <p class="sub">Point this copy at a Firebase project you own. No limits, no codes, nothing shared — and it stays on this device.</p>
+
+          <div class="settings-now">
+            <span class="eyebrow">Currently using</span>
+            <div class="settings-host">${usingOwnBackend
+              ? esc(host(dbUrl)) + ' <span class="settings-tag">yours</span>'
+              : (dbUrl ? esc(host(dbUrl)) + ' <span class="settings-tag shared">shared</span>' : 'nothing yet')}</div>
+          </div>
+
+          <label class="eyebrow" for="ownDb">Realtime Database URL</label>
+          <input id="ownDb" class="field" style="margin:8px 0 14px;" type="text"
+                 placeholder="https://yourproject-default-rtdb.firebaseio.com"
+                 value="${esc(current && current.dbUrl || '')}">
+
+          <label class="eyebrow" for="ownKey">Web API key</label>
+          <input id="ownKey" class="field" style="margin:8px 0 4px;" type="text"
+                 placeholder="AIzaSy…" value="${esc(current && current.apiKey || '')}">
+
+          <div class="err" id="settingsErr"></div>
+          <p class="landing-hint" style="margin-top:12px;">Setting up a project takes about fifteen minutes and costs nothing.
+            ${BUILT_IN.docsUrl ? `<a href="${esc(BUILT_IN.docsUrl)}" target="_blank" rel="noopener">Read the guide</a>.` : 'See <code>docs/setup.md</code>.'}</p>
+
+          <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn" id="saveBackend">Use my database</button>
+            ${current ? '<button class="btn secondary" id="clearBackend">Go back to the shared one</button>' : ''}
+            <button class="btn ghost" id="settingsBack">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+
+    function leave(){
+      const url = new URL(window.location.href);
+      url.searchParams.delete('b');
+      url.searchParams.set('host', '1');
+      window.location.href = url.toString();
+    }
+    document.getElementById('saveBackend').addEventListener('click', ()=>{
+      const db = document.getElementById('ownDb').value.trim().replace(/\/$/, '');
+      const key = document.getElementById('ownKey').value.trim();
+      const err = document.getElementById('settingsErr');
+      if(!db || !key){ err.textContent = 'Both the database URL and the API key are needed.'; return; }
+      if(!/^https:\/\//.test(db)){ err.textContent = 'The database URL should start with https://'; return; }
+      if(!/firebaseio\.com|firebasedatabase\.app/.test(db)){ err.textContent = 'That does not look like a Realtime Database URL.'; return; }
+      if(!saveBackend({ dbUrl:db, apiKey:key })){ err.textContent = 'This browser will not let the setting be saved.'; return; }
+      leave();
+    });
+    const clearBtn = document.getElementById('clearBackend');
+    if(clearBtn) clearBtn.addEventListener('click', ()=>{ saveBackend(null); leave(); });
+    document.getElementById('settingsBack').addEventListener('click', ()=> startHost());
   }
 
   async function startHost(){
@@ -3096,6 +3184,8 @@
   /* ================= ROUTER ================= */
   if(isHost && !dbUrl){
     renderSetup();
+  } else if(params.get('settings') === '1'){
+    renderSettings();
   } else if(isHost){
     /* Hosts go to sign-in and their board picker, board or not. */
     startHost();
