@@ -167,10 +167,27 @@ random string that only travels in that board's QR link, but anyone who has an
 id can read that board while it is open. Treat the drawings as public to
 whoever you gave the link to.
 
-## Data retention
+## What happens to the drawings — for whoever runs this
 
-Nothing is meant to outlive the evening. Drawings and votes are tagged with
-their round; starting a new round deletes them from Firebase and verifies the
-delete took, a background sweep removes anything left over from an earlier
-round, and **Erase all data now** clears drawings, votes and the topic outright.
-Uploads are downscaled to 800×800 JPEG before they are stored.
+Nothing is meant to outlive the evening, and the app deliberately does not
+explain this on screen: presenters only need to know they are starting a new
+round. Here is what actually happens underneath.
+
+- **New round deletes.** Starting a round removes every drawing and vote for
+  the previous one from the database, then re-reads it to confirm the delete
+  took and retries once. Only if that still fails does the host see a warning.
+- **A sweep catches leftovers.** Drawings and votes are tagged with their
+  round, and anything from an earlier round is deleted in the background. Reads
+  also filter by round, so a stale drawing can never appear even if a delete
+  failed.
+- **Clear everything** removes all drawings, votes and the topic in one go.
+- **Deleting a board** takes its drawings and votes with it.
+- **Sessions expire.** A board that nobody is presenting stops accepting reads
+  and writes about half an hour later, so an abandoned link goes dead.
+- Uploads are downscaled to 800×800 JPEG (roughly 10 KB) before being stored,
+  and each drawing is fetched once and cached, not re-downloaded on every poll.
+
+So a drawing lives, at most, from the moment it is submitted until the host
+starts the next round. If you need something kept, save it: guests get **Save
+my drawing** after submitting, and the host can **Download drawings** to get
+the whole round as one image.

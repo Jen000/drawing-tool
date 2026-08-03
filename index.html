@@ -12,7 +12,6 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap"></noscript>
 <!-- deferred: venue wifi should never be able to stop the board from rendering -->
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <style>
   :root{
@@ -108,6 +107,7 @@
   }
   .confirm h2{font-size:24px;margin:0 0 6px;}
   .confirm p{color:var(--ink-soft);font-size:14px;margin:0;}
+  .confirm-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px;}
 
   /* ---------- drawing screen ---------- */
   .draw-shell{display:flex;flex-direction:column;height:100vh;height:100dvh;background:var(--bg);}
@@ -260,7 +260,7 @@
   .host-timer{font-size:26px;font-weight:600;font-variant-numeric:tabular-nums;margin-left:10px;font-family:'Space Grotesk','Inter',sans-serif;}
   .data-note{
     margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);
-    font-size:12px;color:rgba(238,241,248,.55);display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   }
 
   .sec-panel{padding:14px 18px;margin-bottom:22px;}
@@ -669,9 +669,20 @@
   let serverSkew = 0;        /* rules compare against server time, not ours */
 
   function serverNow(){ return Date.now() + serverSkew; }
+  let serverSkewSet = false;
   function noteServerTime(res){
     const d = res.headers.get('date');
-    if(d){ const t = Date.parse(d); if(!isNaN(t)) serverSkew = t - Date.now(); }
+    if(!d) return;
+    const t = Date.parse(d);
+    if(isNaN(t)) return;
+    const measured = t - Date.now();
+    /* Date headers only carry whole seconds, so re-measuring constantly makes
+       the offset wobble and the countdown stutter. Take it once, and only
+       revisit it if the clock genuinely moves (sleep, manual change). */
+    if(!serverSkewSet || Math.abs(measured - serverSkew) > 5000){
+      serverSkew = measured;
+      serverSkewSet = true;
+    }
   }
   function isDenied(res){ return res.status === 401 || res.status === 403; }
 
@@ -959,6 +970,60 @@
     });
   }
 
+  /* ---------- saving pictures ---------- */
+  function downloadDataUrl(dataUrl, filename){
+    const a = document.createElement('a');
+    a.href = dataUrl; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function loadImage(src){
+    return new Promise((resolve)=>{
+      const img = new Image();
+      img.onload = ()=>resolve(img);
+      img.onerror = ()=>resolve(null);
+      img.src = src;
+    });
+  }
+  function safeFilePart(str){
+    return String(str || '').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+  }
+
+  /* Just the drawings laid out in a grid — the thing people actually want to
+     keep, rather than a screenshot of the whole page. */
+  async function composeBoardImage(items, topic){
+    const CELL = 420, PAD = 30, GAP = 22, NAME = 46;
+    const TITLE = topic ? 96 : 0;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(items.length)));
+    const rows = Math.ceil(items.length / cols);
+    const w = PAD*2 + cols*CELL + (cols-1)*GAP;
+    const h = PAD*2 + TITLE + rows*(CELL+NAME) + (rows-1)*GAP;
+
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0,0,w,h);
+    x.textAlign = 'center';
+
+    if(topic){
+      x.fillStyle = '#0f1729';
+      x.font = '700 46px "Space Grotesk", Inter, system-ui, sans-serif';
+      x.fillText(topic, w/2, PAD + 56, w - PAD*2);
+    }
+    for(let i=0;i<items.length;i++){
+      const img = await loadImage(items[i].dataUrl);
+      const cx = PAD + (i % cols) * (CELL + GAP);
+      const cy = PAD + TITLE + Math.floor(i / cols) * (CELL + NAME + GAP);
+      x.fillStyle = '#ffffff'; x.fillRect(cx, cy, CELL, CELL);
+      if(img) x.drawImage(img, cx, cy, CELL, CELL);
+      x.strokeStyle = '#e3e6f0'; x.lineWidth = 2;
+      x.strokeRect(cx+1, cy+1, CELL-2, CELL-2);
+      x.fillStyle = '#606b85';
+      x.font = '600 26px Inter, system-ui, sans-serif';
+      x.fillText(items[i].name || 'Anonymous', cx + CELL/2, cy + CELL + 34, CELL);
+    }
+    return c.toDataURL('image/png');
+  }
+
   /* ================= SHARED SCREEN (the view the room sees) =================
      Everything here is audience-facing: topic, timer, how to join, the drawings
      and the result. No topic box, no phase buttons, no account, no rules — the
@@ -1014,7 +1079,6 @@
 
     const topicEl = document.getElementById('screenTopic');
     const eyebrow = document.getElementById('screenEyebrow');
-    const timerEl = document.getElementById('screenTimer');
 
     const phaseLabel = state.phase === 'voting' ? 'Vote on your phone'
                      : state.phase === 'results' ? 'Results' : 'Topic';
@@ -1024,14 +1088,7 @@
                 : topicText(state);
     if(topicEl.textContent !== topic) topicEl.textContent = topic;
 
-    if(state.phase === 'drawing' && state.timerEnd){
-      const remaining = state.timerEnd - Date.now();
-      timerEl.textContent = fmtTime(remaining);
-      timerEl.classList.toggle('low', remaining < 15000);
-      timerEl.style.display = '';
-    } else {
-      timerEl.style.display = 'none';
-    }
+
 
     /* Joining only matters while people can still draw. */
     const joinEl = document.getElementById('screenJoin');
@@ -1122,6 +1179,7 @@
   /* Standalone second-screen route. */
   async function screenPollLoop(){
     const state = await getState();
+    noteState(state);
     if(readDenied){
       const t = document.getElementById('screenTopic');
       if(t) t.textContent = 'Waiting for the host to open this board…';
@@ -1250,7 +1308,7 @@
       listEl.querySelectorAll('[data-del]').forEach(el=>{
         el.addEventListener('click', async ()=>{
           const id = el.getAttribute('data-del');
-          if(!confirm('Delete this board?\n\nIts drawings and votes are removed from Firebase.')) return;
+          if(!confirm('Delete this board?\n\nIts drawings and votes go with it.')) return;
           el.disabled = true;
           await deleteBoard(id);
           paintList();
@@ -1300,7 +1358,7 @@
     const inner = document.getElementById('drawInner');
     if(!inner) return;
     const why = auth.error === 'OPERATION_NOT_ALLOWED'
-      ? 'Anonymous sign-in is not switched on for this board yet — the host needs to enable it in Firebase.'
+      ? 'This board is not quite set up yet — let the host know.'
       : 'The host has not opened this session yet, or it has already finished. Leave this page open — it will spring to life when the board goes up.';
     inner.innerHTML = `
       <div class="draw-wrap">
@@ -1314,6 +1372,7 @@
 
   async function drawPollLoop(){
     const state = await getState();
+    noteState(state);
 
     /* Rules refuse reads outside the host's session window. */
     if(readDenied){
@@ -1351,15 +1410,48 @@
     if(el && el.textContent !== topicText(state)) el.textContent = topicText(state);
   }
 
-  function updateDrawTimer(state){
-    const el = document.getElementById('drawTimerPill');
-    if(!el) return;
-    if(!state.timerEnd){ el.style.display = 'none'; return; }
-    const remaining = state.timerEnd - Date.now();
-    el.style.display = 'inline-block';
-    el.textContent = '⏱ ' + fmtTime(remaining);
-    el.classList.toggle('low', remaining < 15000);
+  /* Polls arrive every few seconds and at uneven times, so a timer painted by
+     the poll skips and stutters. The deadline is an absolute timestamp, so the
+     poll only has to keep it fresh — a local ticker does the counting. */
+  let latestState = null;
+  function noteState(state){ latestState = state; paintTimers(); }
+
+  function timerRemaining(){
+    const s = latestState;
+    if(!s || s.phase !== 'drawing' || !s.timerEnd) return null;
+    return s.timerEnd - serverNow();
   }
+
+  function paintTimers(){
+    const remaining = timerRemaining();
+    const low = remaining != null && remaining < 15000;
+
+    const pill = document.getElementById('drawTimerPill');
+    if(pill){
+      pill.style.display = remaining == null ? 'none' : 'inline-block';
+      if(remaining != null){
+        pill.textContent = '⏱ ' + fmtTime(remaining);
+        pill.classList.toggle('low', low);
+      }
+    }
+    const host = document.getElementById('hostTimer');
+    if(host){
+      host.textContent = remaining == null ? '' : fmtTime(remaining);
+      host.style.color = low ? 'var(--danger)' : '';
+    }
+    const screen = document.getElementById('screenTimer');
+    if(screen){
+      screen.style.display = remaining == null ? 'none' : '';
+      if(remaining != null){
+        screen.textContent = fmtTime(remaining);
+        screen.classList.toggle('low', low);
+      }
+    }
+  }
+  /* Four ticks a second, so the displayed second turns over on time. */
+  setInterval(paintTimers, 250);
+
+  function updateDrawTimer(state){ noteState(state); }
 
   function starPath(ctx, cx, cy, outerR, innerR){
     const spikes = 5;
@@ -1655,6 +1747,8 @@
       if(!hasDrawn){ showToast('Draw something first!'); return; }
       btn.disabled = true; btn.textContent = '…';
       const name = document.getElementById('nameInput').value.trim() || 'Anonymous';
+      /* Keep a full-resolution copy for them before the canvas goes away. */
+      const keepsake = canvas.toDataURL('image/png');
       const latest = await getState();
       const key = 'd' + Date.now() + Math.random().toString(36).slice(2,8);
       /* Written at its exact path so the rules validate this one drawing. */
@@ -1672,10 +1766,16 @@
             <div class="stamp">✓</div>
             <h2>Added to the board!</h2>
             <p>Your drawing just showed up on the big screen.</p>
-            <div style="margin-top:24px;"><button class="btn" id="drawAgain">Draw another</button></div>
+            <div class="confirm-actions">
+              <button class="btn" id="drawAgain">Draw another</button>
+              <button class="btn secondary" id="saveMine">Save my drawing</button>
+            </div>
           </div>
         </div>`;
       document.getElementById('drawAgain').addEventListener('click', ()=> renderDrawingPhase(state));
+      document.getElementById('saveMine').addEventListener('click', ()=>{
+        downloadDataUrl(keepsake, 'my-drawing-' + (safeFilePart(name) || 'anon') + '.png');
+      });
     });
   }
 
@@ -1842,7 +1942,7 @@
             <div class="save-hint" id="topicHint"></div>
             <div class="control-row">
               <button class="btn small" id="saveTopicBtn">Update topic</button>
-              <button class="btn secondary small" id="downloadBtn">Download board image</button>
+              <button class="btn secondary small" id="downloadBtn">Download drawings</button>
             </div>
             <div class="control-row">
               <span class="lbl">Timer</span>
@@ -1862,8 +1962,7 @@
               </div>
             </div>
             <div class="data-note">
-              <span>🗑️ Drawings and votes are deleted from Firebase whenever you start a new round.</span>
-              <button class="btn danger small" id="wipeBtn">Erase all data now</button>
+              <button class="btn danger small" id="wipeBtn">Clear everything</button>
               <button class="btn danger small" id="closeSessionBtn" style="display:none;">Close session</button>
             </div>
           </div>
@@ -1959,21 +2058,24 @@
       await reopenSession();
       const state = await getState();
       state.phase = 'drawing';
-      state.timerEnd = Date.now() + mins*60000;
+      state.timerEnd = serverNow() + mins*60000;
       await setState(state);
+      noteState(state);
     });
     document.getElementById('votingBtn').addEventListener('click', async ()=>{
       const state = await getState();
       state.phase = 'voting'; state.timerEnd = null;
       await setState(state);
+      noteState(state);
     });
     document.getElementById('resultsBtn').addEventListener('click', async ()=>{
       const state = await getState();
       state.phase = 'results';
       await setState(state);
+      noteState(state);
     });
     document.getElementById('newRoundBtn').addEventListener('click', async ()=>{
-      if(!confirm('Start a fresh round?\n\nEvery drawing and vote from this round is permanently deleted from Firebase.')) return;
+      if(!confirm('Start a new round?\n\nThe drawings and votes on the board now are cleared.')) return;
       const btn = document.getElementById('newRoundBtn');
       btn.disabled = true; btn.textContent = 'Clearing…';
       await reopenSession();
@@ -1986,31 +2088,34 @@
       state.roundStartedAt = Date.now();
       await setState(state);
       btn.disabled = false; btn.textContent = 'New round';
-      showToast(clean ? 'New round started — previous drawings deleted.' : 'New round started, but some data could not be deleted. Retrying in the background.');
+      showToast(clean ? 'New round started.' : 'New round started, but some drawings could not be cleared — check your connection.');
     });
     document.getElementById('wipeBtn').addEventListener('click', async ()=>{
-      if(!confirm('Erase all data?\n\nThis deletes every drawing, vote and the current topic from Firebase.')) return;
+      if(!confirm('Clear everything?\n\nThis removes every drawing, vote and the topic.')) return;
       const btn = document.getElementById('wipeBtn');
-      btn.disabled = true; btn.textContent = 'Erasing…';
+      btn.disabled = true; btn.textContent = 'Clearing…';
       const clean = await wipeRoundData();
       resetBoardCache(); lastHostSignature = null;
       const fresh = { ...DEFAULT_STATE, round: 'r' + Date.now(), roundStartedAt: Date.now() };
       await setState(fresh);
       topicDirty = false; lastRemoteTopic = null;
-      btn.disabled = false; btn.textContent = 'Erase all data now';
-      showToast(clean ? 'All drawings and votes erased from Firebase.' : 'Some data could not be erased — check your connection.');
+      btn.disabled = false; btn.textContent = 'Clear everything';
+      showToast(clean ? 'Everything cleared.' : 'Some of it could not be cleared — check your connection.');
     });
-    document.getElementById('downloadBtn').addEventListener('click', ()=>{
-      if(typeof html2canvas === 'undefined'){
-        showToast('Board capture needs its library — check your connection, or take a screenshot instead.');
-        return;
+    document.getElementById('downloadBtn').addEventListener('click', async ()=>{
+      const btn = document.getElementById('downloadBtn');
+      const state = await getState();
+      const items = await fetchBoard(state);
+      if(!items.length){ showToast('No drawings to save yet.'); return; }
+      btn.disabled = true; btn.textContent = 'Saving…';
+      try{
+        const png = await composeBoardImage(items, state.topic || '');
+        const part = safeFilePart(state.topic) || safeFilePart(boardId) || 'board';
+        downloadDataUrl(png, 'drawings-' + part + '.png');
+      }catch(e){
+        showToast('Could not build the image — try again.');
       }
-      html2canvas(document.querySelector('.host-wrap'), {backgroundColor:'#131a2e', scale:2}).then(canvas=>{
-        const link = document.createElement('a');
-        link.download = 'topic-drawing-board.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-      }).catch(()=>{ showToast('Could not capture the board image — try a regular screenshot instead.'); });
+      btn.disabled = false; btn.textContent = 'Download drawings';
     });
 
     /* Hide the board for a reveal, or to stop guests copying each other.
@@ -2228,6 +2333,7 @@
 
   async function hostPollLoop(){
     const state = await getState();
+    noteState(state);
 
     /* If the rules reject the host, the host ID in them is not this browser's. */
     if(readDenied && !hostDeniedWarned){
@@ -2256,17 +2362,9 @@
     badge.textContent = state.phase;
     badge.className = 'phase-badge ' + state.phase;
 
-    const timerEl = document.getElementById('hostTimer');
-    if(state.phase === 'drawing' && state.timerEnd){
-      const remaining = state.timerEnd - Date.now();
-      timerEl.textContent = fmtTime(remaining);
-      timerEl.style.color = remaining < 15000 ? 'var(--danger)' : '';
-      if(remaining <= 0){
-        state.phase = 'voting'; state.timerEnd = null;
-        await setState(state);
-      }
-    } else {
-      timerEl.textContent = '';
+    if(state.phase === 'drawing' && state.timerEnd && state.timerEnd - serverNow() <= 0){
+      state.phase = 'voting'; state.timerEnd = null;
+      await setState(state);
     }
 
     /* A second screen may have been told to hide/show; follow the shared flag. */
