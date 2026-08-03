@@ -1,0 +1,94 @@
+# Publishes the game to GitHub Pages, filling in the Firebase config from
+# repository variables so the values are not committed to the source.
+#
+# IMPORTANT — this keeps the values out of the repository, NOT out of the
+# published page. The browser has to know them to reach Firebase at all, so
+# they end up in the HTML that Pages serves and anyone can read them with View
+# Source. That is fine and expected: these values identify a project, they do
+# not grant access to it. What actually decides who can host is the /hosts
+# allowlist in firebase-rules.json. See docs/setup.md.
+#
+# Set these under Settings → Secrets and variables → Actions → Variables:
+#   FIREBASE_DB_URL   https://yourproject-default-rtdb.firebaseio.com
+#   FIREBASE_API_KEY  AIzaSy…
+#   DOCS_URL          (optional) link shown in the app's Help panel
+#
+# They are Variables rather than Secrets on purpose: Actions masks secrets in
+# logs, which only obscures values that are public anyway, and a masked value
+# is harder to debug when a deploy goes wrong.
+
+name: Deploy to Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inject Firebase config
+        env:
+          DB_URL: ${{ vars.FIREBASE_DB_URL }}
+          API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          DOCS_URL: ${{ vars.DOCS_URL }}
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$API_KEY" ]; then
+            echo "::error::FIREBASE_DB_URL and FIREBASE_API_KEY must be set as repository variables."
+            echo "Settings → Secrets and variables → Actions → Variables"
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import os, re, sys
+
+          html = open('index.html', encoding='utf-8').read()
+          block = re.search(r"const BUILT_IN = \{.*?\};", html, re.S)
+          if not block:
+              sys.exit("Could not find the BUILT_IN block in index.html")
+
+          def js(value):
+              return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+          replacement = (
+              "const BUILT_IN = {\n"
+              f"    dbUrl:  {js(os.environ['DB_URL'])},\n"
+              f"    apiKey: {js(os.environ['API_KEY'])},\n"
+              f"    docsUrl: {js(os.environ.get('DOCS_URL', ''))}\n"
+              "  };"
+          )
+          open('index.html', 'w', encoding='utf-8').write(html[:block.start()] + replacement + html[block.end():])
+          print("Injected config for", os.environ['DB_URL'])
+          PY
+
+      - name: Check it actually landed
+        run: |
+          grep -q "firebaseio.com\|firebasedatabase.app" index.html \
+            || { echo "::error::Config injection did not take"; exit 1; }
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -143,11 +143,72 @@ If you share your copy with other presenters, their games use your allowance.
 
 ---
 
-## Things worth deciding
+## Deciding who may host
 
-**Anyone with your address can create a host account.** That is what makes it
-shareable. If you want only certain people hosting, the rules need an allowlist
-of email addresses — not built in.
+By default, anyone who can reach your address can create a host account and run
+boards on your database. To restrict it, add a `hosts` node listing the accounts
+you approve:
+
+```json
+{
+  "hosts": {
+    "SoMeUsErId1234": true,
+    "AnOtHeRuSeRiD56": true
+  }
+}
+```
+
+**Realtime Database → Data → ⋮ → Import JSON**, or add the keys by hand.
+
+The rule is opt-in: while `/hosts` does not exist, anybody may host, exactly as
+before. The moment it has one entry, only the accounts listed can create boards
+— so **add your own ID first**, or you will lock yourself out.
+
+To find an ID: sign in on the site and try to create a board. You will be told
+hosting is not switched on for your account, and shown your ID with a copy
+button. That is the string to paste. Anyone asking for access can send you
+theirs the same way.
+
+Playing is never affected. Guests join boards with a code as usual.
+
+Removing someone's line revokes them. Boards they already made keep working
+until you delete them.
+
+## A note on "hiding" the config
+
+You cannot. The browser has to know the database URL and API key to reach
+Firebase, so whatever you do they end up in the page and anyone can read them
+with View Source. Repository variables and the deploy workflow keep them out of
+your *source*, which is tidy and makes rotating them easier, but it is not a
+secret and should not be relied on as one.
+
+The `hosts` allowlist above is the real control. It is enforced by the database,
+not by obscurity.
+
+## Deploying with the config injected
+
+`.github/workflows/deploy.yml` builds the page with the config filled in from
+repository variables, so you do not commit them. Set these under
+**Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Value |
+|---|---|
+| `FIREBASE_DB_URL` | `https://yourproject-default-rtdb.firebaseio.com` |
+| `FIREBASE_API_KEY` | `AIzaSy…` |
+| `DOCS_URL` | optional, a link shown in the app's Help |
+
+Then set **Settings → Pages → Source → GitHub Actions**. Every push to `main`
+redeploys. The workflow fails loudly if the variables are missing rather than
+publishing a broken page.
+
+## Letting people bring their own database
+
+Anyone can point the app at their own Firebase from **Settings**, reached from
+the board list or at `?settings=1`. It is stored on their device only, and while
+it is set, none of your limits apply — it is their database and their allowance.
+A URL with `?db=…&key=…` still overrides it, for one-off links.
+
+## Other things worth knowing
 
 **Anyone holding a board code can read that board while it is open.** Codes only
 travel in that board's QR and on its screen, but treat the drawings as visible

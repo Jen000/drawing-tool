@@ -2,60 +2,136 @@
   "rules": {
     ".read": false,
     ".write": false,
-
+    "hosts": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+    "codes": {
+      "$code": {
+        ".write": "auth != null && data.exists() && !data.child('claimedBy').exists() && newData.child('claimedBy').val() === auth.uid",
+        "claimedBy": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "claimedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "mintedAt": {
+          ".validate": "newData.isNumber() && newData.val() === data.val()"
+        },
+        "note": {
+          ".validate": "newData.isString()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "grants": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && (!data.exists() || data.child('expiresAt').val() < now)",
+        ".validate": "newData.hasChildren(['code','expiresAt','boardsUsed','boardsMax','imagesUsed','imagesMax'])",
+        "code": {
+          ".validate": "newData.isString() && newData.parent().parent().parent().child('codes').child(newData.val()).child('claimedBy').val() === auth.uid"
+        },
+        "expiresAt": {
+          ".validate": "newData.isNumber() && newData.val() > now && newData.val() <= now + 604800000"
+        },
+        "boardsMax": {
+          ".validate": "newData.isNumber() && newData.val() === 6"
+        },
+        "imagesMax": {
+          ".validate": "newData.isNumber() && newData.val() === 90"
+        },
+        "boardsUsed": {
+          ".write": "auth != null && auth.uid === $uid && data.exists() && newData.val() === data.val() + 1",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= data.parent().child('boardsMax').val()"
+        },
+        "imagesUsed": {
+          ".read": "auth != null",
+          ".write": "auth != null && data.exists() && newData.val() === data.val() + 1",
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= data.parent().child('imagesMax').val()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "users": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
       }
     },
-
     "boards": {
       "$b": {
-        ".read": "auth != null && (root.child('boards').child($b).child('owner').val() === auth.uid || root.child('boards').child($b).child('session/openUntil').val() > now)",
-        ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid",
-
+        ".read": "auth != null && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(root.child('boards').child($b).child('owner').val()).exists() || root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('expiresAt').val() > now) && (root.child('boards').child($b).child('owner').val() === auth.uid || root.child('boards').child($b).child('session/openUntil').val() > now)",
+        ".write": "auth != null && root.child('boards').child($b).child('owner').val() === auth.uid && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(root.child('boards').child($b).child('owner').val()).exists() || root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('expiresAt').val() > now)",
         "owner": {
-          ".write": "auth != null && !data.exists() && newData.val() === auth.uid",
+          ".write": "auth != null && !data.exists() && newData.val() === auth.uid && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(auth.uid).exists() || (root.child('grants').child(auth.uid).child('expiresAt').val() > now && newData.parent().parent().parent().child('grants').child(auth.uid).child('boardsUsed').val() === root.child('grants').child(auth.uid).child('boardsUsed').val() + 1))",
           ".validate": "newData.isString()"
         },
-
         "meta": {
           ".validate": "newData.hasChildren(['name'])",
-          "name":      { ".validate": "newData.isString() && newData.val().length <= 40" },
-          "createdAt": { ".validate": "newData.isNumber()" },
-          "$other":    { ".validate": false }
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
         },
-
         "session": {
-          "openUntil": { ".validate": "newData.isNumber()" },
-          "$other":    { ".validate": false }
+          "openUntil": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
         },
-
         "state": {
           ".validate": "newData.hasChildren(['phase', 'round'])"
         },
-
         "board": {
           "$drawing": {
-            ".write": "auth != null && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
+            ".write": "auth != null && $drawing === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now && ((!root.child('hosts').exists() && !root.child('codes').exists()) || root.child('hosts').child(root.child('boards').child($b).child('owner').val()).exists() || (root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('expiresAt').val() > now && newData.parent().parent().parent().parent().child('grants').child(root.child('boards').child($b).child('owner').val()).child('imagesUsed').val() === root.child('grants').child(root.child('boards').child($b).child('owner').val()).child('imagesUsed').val() + 1))",
             ".validate": "newData.hasChildren(['name', 'dataUrl', 'ts', 'round'])",
-            "name":    { ".validate": "newData.isString() && newData.val().length <= 24" },
-            "dataUrl": { ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')" },
-            "ts":      { ".validate": "newData.isNumber()" },
-            "round":   { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
-            "$other":  { ".validate": false }
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 24"
+            },
+            "dataUrl": {
+              ".validate": "newData.isString() && newData.val().length <= 400000 && newData.val().beginsWith('data:image/jpeg;base64,')"
+            },
+            "ts": {
+              ".validate": "newData.isNumber()"
+            },
+            "round": {
+              ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         },
-
         "votes": {
           "$voter": {
             ".write": "auth != null && $voter === auth.uid && !data.exists() && newData.exists() && root.child('boards').child($b).child('session/openUntil').val() > now",
             ".validate": "newData.hasChildren(['choice', 'ts', 'round'])",
-            "choice": { ".validate": "newData.isString() && root.child('boards').child($b).child('board').child(newData.val()).exists()" },
-            "ts":     { ".validate": "newData.isNumber()" },
-            "round":  { ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()" },
-            "$other": { ".validate": false }
+            "choice": {
+              ".validate": "newData.isString() && root.child('boards').child($b).child('board').child(newData.val()).exists()"
+            },
+            "ts": {
+              ".validate": "newData.isNumber()"
+            },
+            "round": {
+              ".validate": "newData.isString() && newData.val() === root.child('boards').child($b).child('state/round').val()"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         }
       }
