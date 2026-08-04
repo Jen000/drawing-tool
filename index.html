@@ -1695,6 +1695,18 @@
   function renderSettings(){
     const current = savedBackend();
     const host = (u)=>{ try{ return new URL(u).host; }catch(e){ return u || ''; } };
+    /* ?settings=1 has done its job the moment this is on screen, and the
+       router checks it before anything else — so leaving it in the address
+       makes Settings sticky. Bookmark that address, or let a browser
+       autocomplete to it, and every future visit lands here instead of
+       sign-in, which looks exactly like being unable to sign in. */
+    try{
+      const u = new URL(window.location.href);
+      if(u.searchParams.has('settings')){
+        u.searchParams.delete('settings');
+        history.replaceState(null, '', u.toString());
+      }
+    }catch(e){}
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card">
@@ -3248,7 +3260,7 @@
     app.innerHTML = `
       <div class="setup-wrap">
         <div class="setup-card join-card">
-          <button class="btn ghost landing-signin" id="topSignInBtn">Sign in</button>
+          <button class="btn ghost landing-signin" id="topSignInBtn">${canHost ? 'Sign in' : 'Set up'}</button>
           <div class="landing-mark">🎨</div>
           <h2>Draw the Topic</h2>
           <p class="sub">Everyone draws the same topic on their phone, then the room votes for a favourite.</p>
@@ -3302,6 +3314,7 @@
     document.getElementById('landingHelpBtn').addEventListener('click', openHelp);
     function goHost(){
       const url = new URL(window.location.href);
+      url.searchParams.delete('settings');
       url.searchParams.set('host', '1');
       window.location.href = url.toString();
     }
