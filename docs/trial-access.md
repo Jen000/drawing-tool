@@ -32,7 +32,15 @@ handing them your whole allowance.
 codes/<CODE>    { mintedAt, note?, claimedBy?, claimedAt? }
 grants/<uid>    { code, expiresAt, boardsUsed, boardsMax, imagesUsed, imagesMax }
 hosts/<uid>     true
+hostingGate     nothing — see below
 ```
+
+`hostingGate` never holds anything. It exists so the app can find out whether
+hosting is restricted at all, which it cannot ask of `/hosts` directly because
+that node is not readable. Its rule is `root.child('hosts').exists()`, so
+*reading* it succeeds exactly when the allowlist has entries. One bit, and the
+allowlist itself stays private. Deleting the node changes nothing; deleting its
+rule makes the app treat the copy as unrestricted.
 
 ## How the limits get enforced without a server
 
@@ -93,3 +101,23 @@ rather than failing silently.
 **Settings**, from the board list or `?settings=1`, takes a database URL and API
 key and stores them on that device. From then on the app talks to that project
 instead, so no code, allowance or limit applies. Reverting is one button.
+
+## Which project an account is created in
+
+Accounts belong to whichever Firebase project the app is pointed at when they
+are made, because sign-up goes to that project's Identity Toolkit. So somebody
+who intends to run their own copy should be sent there *before* signing up,
+or they leave an account behind in yours that they will never use again.
+
+On a restricted copy, **Create an account** therefore asks which they want
+first: start a free week here, or bring their own Firebase. Only the first
+creates an account on your project. Choosing the second opens Settings, and
+once saved the page is talking to their project, so the account they then
+create is theirs.
+
+Where hosting is not restricted there is nothing to choose between, and
+sign-up goes straight to the email and password form as before.
+
+A new account with no allowance is shown the code screen the moment it signs
+in, rather than after a board creation is refused — otherwise being walled off
+is indistinguishable from a broken sign-in.
