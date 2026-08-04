@@ -76,8 +76,22 @@ jobs:
 
       - name: Check it actually landed
         run: |
-          grep -q "firebaseio.com\|firebasedatabase.app" index.html \
-            || { echo "::error::Config injection did not take"; exit 1; }
+          # Look inside the BUILT_IN block itself. Grepping the whole file for a
+          # database URL always passes, because the Settings form carries one as
+          # placeholder text — so a silent no-op injection would ship a page with
+          # no config in it, which looks to a visitor like sign-in being broken.
+          python3 - <<'PY'
+          import re, sys
+          html = open('index.html', encoding='utf-8').read()
+          block = re.search(r"const BUILT_IN = \{.*?\};", html, re.S)
+          if not block:
+              sys.exit("::error::BUILT_IN block missing from the built page")
+          for field in ('dbUrl', 'apiKey'):
+              m = re.search(field + r"\s*:\s*'([^']*)'", block.group(0))
+              if not m or not m.group(1).strip():
+                  sys.exit(f"::error::{field} is empty in the built page — injection did not take")
+          print("Config is present in the built page")
+          PY
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
