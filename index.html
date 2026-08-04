@@ -615,7 +615,15 @@
      browser is already using. */
   const joiningPlainLink = !!boardId && !isHost && params.get('screen') !== '1' && !params.get('db');
   const usingOwnBackend = !!(backend && backend.dbUrl && !params.get('db') && !joiningPlainLink);
-  const dbUrl = params.get('db') || (!joiningPlainLink && backend && backend.dbUrl) || BUILT_IN.dbUrl || '';
+  /* A database address with no scheme is a *relative* path to the browser, so
+     every request silently goes to whatever host is serving this page and
+     404s. Firebase only speaks https, so assume it rather than fail in a way
+     that looks like sign-in being broken. */
+  function withScheme(u){
+    if(!u) return '';
+    return /^https?:\/\//i.test(u) ? u : 'https://' + String(u).replace(/^\/+/, '');
+  }
+  const dbUrl = withScheme(params.get('db') || (!joiningPlainLink && backend && backend.dbUrl) || BUILT_IN.dbUrl || '');
   const apiKey = params.get('key') || (!joiningPlainLink && backend && backend.apiKey) || BUILT_IN.apiKey || '';
   /* Trials, codes and the host allowlist belong to the copy this page was
      deployed as. On somebody else's database none of it applies, so none of it
