@@ -52,6 +52,19 @@ jobs:
             exit 1
           fi
 
+          # Without a scheme the browser reads the address as a path relative to
+          # the page, so every database call goes to the site itself and 404s —
+          # which looks like broken sign-in rather than a mistyped setting.
+          case "$DB_URL" in
+            https://*) ;;
+            http://*)
+              echo "::error::DB_URL must use https:// — Firebase refuses plain http."
+              exit 1 ;;
+            *)
+              echo "::error::DB_URL is missing https:// at the front. It should look like https://yourproject-default-rtdb.firebaseio.com"
+              exit 1 ;;
+          esac
+
           python3 - <<'PY'
           import os, re, sys
 
